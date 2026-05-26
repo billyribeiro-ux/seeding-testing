@@ -343,24 +343,9 @@ async fn update_note(
     if payload.body.len() > MAX_BODY_BYTES {
         return Err(ApiError::PayloadTooLarge(payload.body.len()));
     }
-    // sqlx-notes doesn't yet expose `update`; do an emulation here using a transaction.
-    // We rely on RETURNING in a single UPDATE statement.
-    let trimmed = payload.body.trim();
-    if trimmed.is_empty() {
-        return Err(ApiError::from(NotesError::Empty));
-    }
-    if trimmed.chars().count() > 4096 {
-        return Err(ApiError::from(NotesError::TooLong(trimmed.chars().count())));
-    }
-    let row: Option<Note> = sqlx::query_as::<_, Note>(
-        "UPDATE notes SET body = ? WHERE id = ? RETURNING id, body, created_at",
-    )
-    .bind(trimmed)
-    .bind(id)
-    .fetch_optional(&s.pool)
-    .await
-    .map_err(NotesError::from)?;
-    let note = row.ok_or(NotesError::NotFound(id))?;
+    // E4.3 — body validation + UPDATE…RETURNING moved into the lib so
+    // the handler stays one line per concern.
+    let note = sqlx_notes::update(&s.pool, id, &payload.body).await?;
     Ok(Json(NoteDto::from(note)))
 }
 

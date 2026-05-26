@@ -61,9 +61,17 @@ Add an integration test that sends a 9000-byte payload and asserts the 413.
 
 ---
 
-## E4.3 — Add the `update` function to `sqlx-notes` (Medium)
+## E4.3 — Add the `update` function to `sqlx-notes` (Medium) — shipped
 
 Move the `UPDATE` SQL out of `notes-api::update_note` into `sqlx_notes::update`. Match the existing API style; add a unit test in `sqlx-notes/tests/notes.rs`.
+
+Reference implementation: `projects/02c-sqlx-notes/src/lib.rs::update` takes
+the same `(pool, id, body)` shape and enforces the same trim + non-empty +
+4096-char rules as `add`. The notes-api handler collapses to a single line:
+`sqlx_notes::update(&s.pool, id, &payload.body).await.map(NoteDto::from)`.
+4 unit tests in `projects/02c-sqlx-notes/tests/notes.rs` cover happy path,
+empty-body reject (with confirmation the original row is unchanged),
+too-long reject, and unknown id.
 
 <details><summary>Answer (sketch)</summary>
 

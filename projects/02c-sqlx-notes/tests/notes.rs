@@ -4,7 +4,9 @@
 //! Same shape we'll use against Postgres via testcontainers in Phase 4.
 
 use sqlx::sqlite::SqlitePoolOptions;
-use sqlx_notes::{NotesError, add, delete, get, list, list_keyset, migrate, parse_created_at};
+use sqlx_notes::{
+    NotesError, add, delete, get, list, list_keyset, migrate, parse_created_at, update,
+};
 
 async fn fresh_pool() -> sqlx::SqlitePool {
     let pool = SqlitePoolOptions::new()
@@ -152,6 +154,46 @@ async fn list_keyset_with_cursor_skips_to_the_window() {
         page.iter().map(|n| n.id).collect::<Vec<_>>(),
         vec![b.id, a.id]
     );
+}
+
+// ---------------------------------------------------------------------------
+// update — Phase 4 E4.3
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn update_swaps_the_body() {
+    let pool = fresh_pool().await;
+    let n = add(&pool, "before").await.unwrap();
+    let updated = update(&pool, n.id, "after").await.unwrap();
+    assert_eq!(updated.id, n.id);
+    assert_eq!(updated.body, "after");
+}
+
+#[tokio::test]
+async fn update_rejects_empty_body() {
+    let pool = fresh_pool().await;
+    let n = add(&pool, "starting body").await.unwrap();
+    let err = update(&pool, n.id, "   ").await.unwrap_err();
+    assert!(matches!(err, NotesError::Empty));
+    // Original row unchanged.
+    let still_there = get(&pool, n.id).await.unwrap();
+    assert_eq!(still_there.body, "starting body");
+}
+
+#[tokio::test]
+async fn update_rejects_too_long_body() {
+    let pool = fresh_pool().await;
+    let n = add(&pool, "ok").await.unwrap();
+    let long: String = "a".repeat(4097);
+    let err = update(&pool, n.id, &long).await.unwrap_err();
+    assert!(matches!(err, NotesError::TooLong(4097)));
+}
+
+#[tokio::test]
+async fn update_unknown_id_returns_not_found() {
+    let pool = fresh_pool().await;
+    let err = update(&pool, 9999, "doesn't matter").await.unwrap_err();
+    assert!(matches!(err, NotesError::NotFound(9999)));
 }
 
 #[tokio::test]

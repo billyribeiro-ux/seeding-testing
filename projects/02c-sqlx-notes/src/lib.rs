@@ -113,6 +113,27 @@ pub async fn add(pool: &SqlitePool, body: &str) -> NotesResult<Note> {
     Ok(row)
 }
 
+/// Update a note's body (Phase 4 — E4.3). Same validation rules as
+/// [`add`]: trims whitespace, rejects empty bodies and bodies longer
+/// than 4096 chars. Returns the updated row.
+pub async fn update(pool: &SqlitePool, id: i64, body: &str) -> NotesResult<Note> {
+    let trimmed = body.trim();
+    if trimmed.is_empty() {
+        return Err(NotesError::Empty);
+    }
+    if trimmed.chars().count() > 4096 {
+        return Err(NotesError::TooLong(trimmed.chars().count()));
+    }
+    let row: Option<Note> = sqlx::query_as::<_, Note>(
+        "UPDATE notes SET body = ? WHERE id = ? RETURNING id, body, created_at",
+    )
+    .bind(trimmed)
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+    row.ok_or(NotesError::NotFound(id))
+}
+
 /// Delete a note by id. Returns `Ok(())` if a row was deleted; `Err(NotFound)` otherwise.
 pub async fn delete(pool: &SqlitePool, id: i64) -> NotesResult<()> {
     let result = sqlx::query("DELETE FROM notes WHERE id = ?")
