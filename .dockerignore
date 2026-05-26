@@ -1,0 +1,13 @@
+target/
+node_modules/
+.svelte-kit/
+build/
+.git/
+.github/
+.claude/
+docs/
+curriculum/
+*.log
+.env
+.env.*
+!.env.example

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "mcpServers": {
+    "rust-analyzer": {
+      "command": "rust-analyzer-mcp",
+      "description": "Rust IDE intelligence (go-to-def, hover, diagnostics). cargo install --locked rust-analyzer-mcp"
+    },
+    "rust-docs": {
+      "command": "rust-docs-mcp",
+      "args": ["--registry", "https://docs.rs"],
+      "description": "Live crate documentation from docs.rs. cargo install --locked rust-docs-mcp"
+    }
+  },
+  "permissions": {
+    "allow": [
+      "Bash(cargo *)",
+      "Bash(rustup *)",
+      "Bash(rustc *)",
+      "Bash(sqlx *)",
+      "Bash(psql *)",
+      "Bash(docker *)",
+      "Bash(docker compose *)",
+      "Bash(make *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git push*)",
+      "Bash(git pull*)",
+      "Bash(git fetch*)",
+      "Bash(git checkout*)",
+      "Bash(git rebase*)",
+      "Bash(git stash*)",
+      "Bash(gh *)",
+      "Bash(stripe *)",
+      "Bash(pnpm *)",
+      "Bash(npm *)",
+      "Bash(node *)",
+      "Bash(npx *)",
+      "Bash(ls*)",
+      "Bash(cat*)",
+      "Bash(grep*)",
+      "Bash(rg*)",
+      "Bash(find*)",
+      "Bash(mkdir*)",
+      "Bash(cp*)",
+      "Bash(mv*)",
+      "Bash(echo*)",
+      "Bash(which*)",
+      "Bash(command -v*)",
+      "Bash(env)",
+      "Bash(pwd)"
+    ]
+  }
+}

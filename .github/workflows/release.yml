@@ -1,0 +1,78 @@
+name: Release
+
+# Cuts a versioned release: tag, draft release notes from Conventional Commits,
+# build the workspace once, and let CD pick up the tag for deployment.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Semver bump"
+        required: true
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    name: cut release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Pre-release verify
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --workspace --all-targets --all-features -- -D warnings
+          cargo test --workspace --all-features
+
+      - name: Compute next version
+        id: ver
+        run: |
+          set -euo pipefail
+          current=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          current=${current#v}
+          IFS='.' read -r M m p <<< "$current"
+          case "${{ inputs.bump }}" in
+            major) M=$((M+1)); m=0; p=0 ;;
+            minor) m=$((m+1)); p=0 ;;
+            patch) p=$((p+1)) ;;
+          esac
+          next="v${M}.${m}.${p}"
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+          echo "Next version: $next"
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          set -euo pipefail
+          prev=$(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)
+          {
+            echo "## What's changed since ${prev}"
+            echo ""
+            git log "${prev}..HEAD" --pretty=format:"- %s (%h)" --no-merges
+          } > RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+
+      - name: Tag
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.ver.outputs.next }}" -m "Release ${{ steps.ver.outputs.next }}"
+          git push origin "${{ steps.ver.outputs.next }}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.ver.outputs.next }}" \
+            --title "${{ steps.ver.outputs.next }}" \
+            --notes-file RELEASE_NOTES.md

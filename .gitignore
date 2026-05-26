@@ -1,0 +1,44 @@
+# Rust
+target/
+**/*.rs.bk
+# Cargo.lock IS committed (this is a binary workspace, not a library).
+# If you ever publish a library crate, add an exception for that crate's Cargo.lock only.
+
+# sqlx offline cache (committed) — but ignore stray query files
+.sqlx-tmp/
+
+# Node / SvelteKit
+node_modules/
+.svelte-kit/
+build/
+.vercel/
+.netlify/
+.wrangler/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/settings.json.example
+!.vscode/extensions.json
+*.swp
+*.swo
+
+# Coverage
+coverage/
+*.profraw
+*.profdata
+lcov.info
+
+# Docker
+docker-compose.override.yaml
+
+# Misc local
+.local/
+tmp/
+*.log

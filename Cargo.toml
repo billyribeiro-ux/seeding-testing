@@ -1,0 +1,46 @@
+[workspace]
+resolver = "3"
+members = [
+    "projects/01-hello-cli",
+]
+
+[workspace.package]
+version    = "0.1.0"
+edition    = "2024"
+rust-version = "1.85"   # edition 2024 requires >= 1.85
+license    = "MIT OR Apache-2.0"
+repository = "https://github.com/billyribeiro-ux/seeding-testing"
+authors    = ["Seeding-Testing Curriculum <hello@example.invalid>"]
+
+# Shared dependency versions — every crate in the workspace can `dep.workspace = true`.
+# Pin to the May 2026 stack from the curriculum plan.
+[workspace.dependencies]
+# Pins target the May 26, 2026 latest stable; semver-compatible patch updates allowed.
+# CLI
+clap        = { version = "4.6", features = ["derive"] }
+anyhow      = "1.0"
+thiserror   = "2.0"
+
+# Logging / tracing
+tracing             = "0.1"
+tracing-subscriber  = { version = "0.3", features = ["env-filter", "fmt"] }
+
+# Test helpers (used in tests/ across crates)
+assert_cmd  = "2.2"
+predicates  = "3.1"
+tempfile    = "3.27"
+
+[profile.dev]
+opt-level    = 0
+debug        = true
+incremental  = true
+
+[profile.release]
+opt-level    = 3
+lto          = "thin"
+codegen-units = 1
+strip        = "symbols"
+
+# Faster test+debug feedback than default
+[profile.test]
+opt-level = 1
