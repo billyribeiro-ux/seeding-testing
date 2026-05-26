@@ -85,7 +85,7 @@ Simpler: add a `from_fn` middleware that runs *after* the handler and, if the re
 
 ---
 
-## E4.5 — Keyset pagination (Medium)
+## E4.5 — Keyset pagination (Medium) — shipped
 
 Implement keyset pagination for `GET /v1/notes`:
 
@@ -93,6 +93,17 @@ Implement keyset pagination for `GET /v1/notes`:
 - New query params: `?limit=N&cursor=...`.
 - Cursor is base64-encoded JSON of `{ "i": <last id> }` (id-descending ordering is enough since `id` is monotonic on insert).
 - Add at least two integration tests: first page + follow-up page.
+
+A reference implementation lives in `projects/02c-sqlx-notes/src/lib.rs`
+(`list_keyset`) and the `list_notes` handler in
+`projects/03-notes-api/src/lib.rs`. Eight tests cover the contract:
+three unit tests in `projects/02c-sqlx-notes/tests/notes.rs` (no cursor,
+mid-walk cursor, end-of-list cursor) plus five integration tests in
+`projects/03-notes-api/tests/keyset_pagination.rs` (full multi-page walk
+in id-descending order, "no row dropped or duplicated" invariant over
+17 rows × `limit=5`, malformed-cursor → 400 problem-details with the
+specific `/problems/bad-cursor` type, and `limit` clamping at both
+ends `[1, 100]`).
 
 <details><summary>Answer (sketch)</summary>
 

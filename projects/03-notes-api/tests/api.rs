@@ -56,7 +56,9 @@ async fn list_initially_empty() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     let body = read_json(res.into_body()).await;
-    assert!(body.as_array().unwrap().is_empty());
+    // Phase 4 — E4.5: keyset response shape.
+    assert!(body["items"].as_array().unwrap().is_empty());
+    assert!(body["next"].is_null());
 }
 
 #[tokio::test]
@@ -81,7 +83,11 @@ async fn create_then_list() {
         .await
         .unwrap();
     let list = read_json(res.into_body()).await;
-    assert_eq!(list.as_array().unwrap().len(), 1);
+    assert_eq!(list["items"].as_array().unwrap().len(), 1);
+    assert!(
+        list["next"].is_null(),
+        "single-page result has no next cursor"
+    );
 }
 
 #[tokio::test]
@@ -222,7 +228,12 @@ async fn list_respects_limit() {
         .await
         .unwrap();
     let body = read_json(res.into_body()).await;
-    assert_eq!(body.as_array().unwrap().len(), 2);
+    assert_eq!(body["items"].as_array().unwrap().len(), 2);
+    // We inserted MORE than `limit` rows, so a next cursor must be present.
+    assert!(
+        body["next"].as_str().is_some(),
+        "limit < total must yield a next cursor"
+    );
 }
 
 #[tokio::test]

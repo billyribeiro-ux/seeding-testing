@@ -200,22 +200,80 @@ async fn health() -> Json<Health> {
 // Handlers
 // ---------------------------------------------------------------------------
 
+/// Pagination query for `GET /v1/notes`.
+///
+/// Phase 4 — E4.5 (keyset pagination):
+///   * `limit` clamps to `[1, 100]` and defaults to `20`.
+///   * `cursor` is an opaque base64url-encoded JSON value; the only
+///     way to obtain one is to read `next` from a previous response.
+///     The client never has to know its shape.
 #[derive(Debug, Deserialize, Default)]
 pub struct ListQuery {
     #[serde(default)]
     limit: Option<u32>,
+    #[serde(default)]
+    cursor: Option<String>,
 }
 
-#[tracing::instrument(skip(s), fields(limit = ?q.limit))]
+#[derive(Debug, Serialize, Deserialize)]
+struct Cursor {
+    /// Last (smallest) id from the previous page. Newest-first means
+    /// "next" page is rows with `id < i`.
+    i: i64,
+}
+
+fn encode_cursor(c: &Cursor) -> String {
+    use base64::Engine;
+    base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .encode(serde_json::to_vec(c).expect("Cursor must serialize"))
+}
+
+fn decode_cursor(s: &str) -> Result<Cursor, ApiError> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(s.as_bytes())
+        .map_err(|_| ApiError::BadCursor)?;
+    serde_json::from_slice(&bytes).map_err(|_| ApiError::BadCursor)
+}
+
+/// One page of notes plus the opaque cursor a client uses to fetch the
+/// next page. `next` is `None` when the caller has reached the end.
+#[derive(Debug, Serialize)]
+pub struct NotesPage {
+    pub items: Vec<NoteDto>,
+    pub next: Option<String>,
+}
+
+#[tracing::instrument(skip(s), fields(limit = ?q.limit, has_cursor = q.cursor.is_some()))]
 async fn list_notes(
     State(s): State<Arc<AppState>>,
     Query(q): Query<ListQuery>,
-) -> Result<Json<Vec<NoteDto>>, ApiError> {
-    let mut items = sqlx_notes::list(&s.pool).await?;
-    if let Some(limit) = q.limit {
-        items.truncate(limit as usize);
-    }
-    Ok(Json(items.into_iter().map(NoteDto::from).collect()))
+) -> Result<Json<NotesPage>, ApiError> {
+    let limit = i64::from(q.limit.unwrap_or(20).clamp(1, 100));
+    let after_id = match q.cursor.as_deref() {
+        Some(s) => Some(decode_cursor(s)?.i),
+        None => None,
+    };
+
+    // Ask the lib for one MORE than we'll return so we can tell whether
+    // there's a next page without a second query.
+    let mut items = sqlx_notes::list_keyset(&s.pool, after_id, limit + 1).await?;
+
+    // `limit` is clamped to `[1, 100]` above so the casts are safe.
+    let limit_usize = usize::try_from(limit).unwrap_or(0);
+    let next = if items.len() > limit_usize {
+        items.truncate(limit_usize);
+        items
+            .last()
+            .map(|last| encode_cursor(&Cursor { i: last.id }))
+    } else {
+        None
+    };
+
+    Ok(Json(NotesPage {
+        items: items.into_iter().map(NoteDto::from).collect(),
+        next,
+    }))
 }
 
 #[derive(Debug, Deserialize)]
@@ -314,6 +372,9 @@ pub enum ApiError {
 
     #[error("invalid request body")]
     BadRequest(String),
+
+    #[error("invalid cursor")]
+    BadCursor,
 }
 
 #[derive(Serialize)]
@@ -352,6 +413,12 @@ impl IntoResponse for ApiError {
                     "Bad Request",
                     "https://memberclub.test/problems/bad-request",
                     msg.clone(),
+                ),
+                ApiError::BadCursor => (
+                    StatusCode::BAD_REQUEST,
+                    "Bad Request",
+                    "https://memberclub.test/problems/bad-cursor",
+                    "cursor is malformed or expired; refetch the first page".to_string(),
                 ),
             };
 

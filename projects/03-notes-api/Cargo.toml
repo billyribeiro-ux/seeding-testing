@@ -38,6 +38,7 @@ uuid       = { workspace = true }
 sqlx-notes = { path = "../02c-sqlx-notes" }
 metrics    = "0.24"
 metrics-exporter-prometheus = { version = "0.16", default-features = false }
+base64     = "0.22"
 
 [dev-dependencies]
 tokio = { workspace = true }

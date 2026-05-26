@@ -52,6 +52,48 @@ pub async fn list(pool: &SqlitePool) -> NotesResult<Vec<Note>> {
     Ok(rows)
 }
 
+/// Keyset-paginated list (Phase 4 — E4.5).
+///
+/// Returns up to `limit` notes with `id < after_id` (when `after_id` is
+/// `Some`), newest first. The caller asks for `limit + 1` if it wants
+/// to detect whether there's a next page — see how `notes-api` uses
+/// this in its `list_notes` handler.
+///
+/// Why keyset and not OFFSET? OFFSET re-scans rows up to the offset on
+/// every request and falls over once you're 100k rows deep. Keyset
+/// reads at most `limit` rows via an index, period. The trade-off:
+/// you can't jump to a numbered page directly — only "next" / "prev"
+/// — which is fine for any UX that isn't a 1990s search-results page.
+pub async fn list_keyset(
+    pool: &SqlitePool,
+    after_id: Option<i64>,
+    limit: i64,
+) -> NotesResult<Vec<Note>> {
+    let rows = match after_id {
+        Some(after) => {
+            sqlx::query_as::<_, Note>(
+                "SELECT id, body, created_at FROM notes
+                 WHERE id < ?
+                 ORDER BY id DESC
+                 LIMIT ?",
+            )
+            .bind(after)
+            .bind(limit)
+            .fetch_all(pool)
+            .await?
+        }
+        None => {
+            sqlx::query_as::<_, Note>(
+                "SELECT id, body, created_at FROM notes ORDER BY id DESC LIMIT ?",
+            )
+            .bind(limit)
+            .fetch_all(pool)
+            .await?
+        }
+    };
+    Ok(rows)
+}
+
 /// Add a new note. Returns the created row.
 pub async fn add(pool: &SqlitePool, body: &str) -> NotesResult<Note> {
     let trimmed = body.trim();

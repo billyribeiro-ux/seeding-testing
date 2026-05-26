@@ -4,7 +4,7 @@
 //! Same shape we'll use against Postgres via testcontainers in Phase 4.
 
 use sqlx::sqlite::SqlitePoolOptions;
-use sqlx_notes::{NotesError, add, delete, get, list, migrate, parse_created_at};
+use sqlx_notes::{NotesError, add, delete, get, list, list_keyset, migrate, parse_created_at};
 
 async fn fresh_pool() -> sqlx::SqlitePool {
     let pool = SqlitePoolOptions::new()
@@ -117,4 +117,48 @@ async fn check_constraint_blocks_empty_body_at_db_layer() {
         .execute(&pool)
         .await;
     assert!(res.is_err(), "DB should refuse the empty body");
+}
+
+// ---------------------------------------------------------------------------
+// list_keyset — Phase 4 E4.5 keyset pagination
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn list_keyset_with_no_cursor_returns_newest_first_up_to_limit() {
+    let pool = fresh_pool().await;
+    let a = add(&pool, "first").await.unwrap();
+    let b = add(&pool, "second").await.unwrap();
+    let c = add(&pool, "third").await.unwrap();
+
+    let page = list_keyset(&pool, None, 2).await.unwrap();
+    // Newest-first: c, b.
+    assert_eq!(
+        page.iter().map(|n| n.id).collect::<Vec<_>>(),
+        vec![c.id, b.id]
+    );
+    let _ = a; // suppress unused warning if any
+}
+
+#[tokio::test]
+async fn list_keyset_with_cursor_skips_to_the_window() {
+    let pool = fresh_pool().await;
+    let a = add(&pool, "first").await.unwrap();
+    let b = add(&pool, "second").await.unwrap();
+    let c = add(&pool, "third").await.unwrap();
+
+    // "Next page after seeing c.id" — should return b then a.
+    let page = list_keyset(&pool, Some(c.id), 10).await.unwrap();
+    assert_eq!(
+        page.iter().map(|n| n.id).collect::<Vec<_>>(),
+        vec![b.id, a.id]
+    );
+}
+
+#[tokio::test]
+async fn list_keyset_at_end_of_list_returns_empty() {
+    let pool = fresh_pool().await;
+    let a = add(&pool, "first").await.unwrap();
+    // Asking for rows older than the only row yields nothing.
+    let page = list_keyset(&pool, Some(a.id), 5).await.unwrap();
+    assert!(page.is_empty(), "no rows beyond the oldest");
 }
