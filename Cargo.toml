@@ -4,6 +4,7 @@ members = [
     "projects/01-hello-cli",
     "projects/02-quote-generator",
     "projects/02c-sqlx-notes",
+    "projects/03-notes-api",
 ]
 
 [workspace.package]
@@ -32,6 +33,16 @@ humantime = "2.2"
 # Database (sqlx) + types
 sqlx     = { version = "0.8", default-features = false }
 chrono   = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
+uuid     = { version = "1.10", features = ["v4", "v7", "serde"] }
+
+# HTTP framework + tower
+axum     = { version = "0.8", default-features = false, features = ["http1", "http2", "tokio", "json", "matched-path", "tracing", "query"] }
+tower    = { version = "0.5" }
+tower-http = { version = "0.6", features = ["trace", "compression-gzip", "cors", "request-id", "util", "timeout"] }
+
+# Serialization
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 # Logging / tracing
 tracing             = "0.1"
