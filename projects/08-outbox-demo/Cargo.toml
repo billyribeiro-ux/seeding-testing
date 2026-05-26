@@ -1,0 +1,47 @@
+[package]
+name        = "outbox-demo"
+version     = { workspace = true }
+edition     = { workspace = true }
+rust-version = { workspace = true }
+license     = { workspace = true }
+description = "Phase 11 outbox-pattern demo — a business write and a side-effect intent committed atomically in one transaction; a worker drains the outbox idempotently. Reads in 200 lines."
+
+[[bin]]
+name = "outbox-demo"
+path = "src/main.rs"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+anyhow    = { workspace = true }
+thiserror = { workspace = true }
+clap      = { workspace = true }
+serde     = { workspace = true }
+serde_json = { workspace = true }
+tokio     = { workspace = true }
+tracing   = { workspace = true }
+tracing-subscriber = { workspace = true }
+chrono    = { workspace = true }
+humantime = { workspace = true }
+sqlx      = { workspace = true, features = ["runtime-tokio", "tls-rustls", "sqlite", "macros", "migrate"] }
+
+[dev-dependencies]
+tokio = { workspace = true }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all      = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+must_use_candidate      = "allow"
+missing_errors_doc      = "allow"
+missing_panics_doc      = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss          = "allow"
+cast_possible_wrap      = "allow"
+doc_markdown            = "allow"
+inconsistent_digit_grouping = "allow"
+items_after_statements      = "allow"

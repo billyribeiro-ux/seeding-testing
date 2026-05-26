@@ -9,6 +9,7 @@ members = [
     "projects/05-rbac-policy-lab",
     "projects/06-stripe-money-lab",
     "projects/07-webhook-receiver",
+    "projects/08-outbox-demo",
 ]
 
 [workspace.package]
