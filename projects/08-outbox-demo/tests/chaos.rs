@@ -83,12 +83,8 @@ async fn many_workers_drain_disjoint() {
             worker_id,
         };
         handles.push(tokio::spawn(async move {
-            loop {
-                match run_once(&pool, &recorder, 5).await.unwrap() {
-                    true => {} // grabbed a row; keep going
-                    false => break, // queue drained
-                }
-            }
+            // Drain until run_once returns false (queue empty).
+            while run_once(&pool, &recorder, 5).await.unwrap() {}
         }));
     }
 
@@ -181,17 +177,15 @@ async fn producers_and_workers_race_to_empty() {
             // is empty. Tokio's `Notify` lets us check non-blockingly.
             let mut producers_finished = false;
             for _ in 0..1000 {
-                match run_once(&pool, &recorder, 5).await.unwrap() {
-                    true => continue,
-                    false => {
-                        if producers_finished {
-                            return;
-                        }
-                        // Wait briefly for either producers-done or new work.
-                        tokio::select! {
-                            () = done.notified() => producers_finished = true,
-                            () = tokio::time::sleep(std::time::Duration::from_millis(10)) => {}
-                        }
+                if run_once(&pool, &recorder, 5).await.unwrap() {
+                    // grabbed a row; keep draining
+                } else if producers_finished {
+                    return;
+                } else {
+                    // Wait briefly for either producers-done or new work.
+                    tokio::select! {
+                        () = done.notified() => producers_finished = true,
+                        () = tokio::time::sleep(std::time::Duration::from_millis(10)) => {}
                     }
                 }
             }
