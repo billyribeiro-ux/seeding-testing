@@ -74,19 +74,21 @@ ADRs live at `docs/01-architecture-decisions/`. They use the MADR template (Mark
 
 | # | Title | Status |
 |---|---|---|
-| 0001 | Rust + Axum for the API | (planned) |
-| 0002 | ORM stance: sqlx for prod, Drizzle/SQLite for the on-ramp | (planned) |
-| 0003 | Money: i64 cents + $21B ceiling, never floats | (planned) |
-| 0004 | Dual-mode auth: cookies for web, JWT for API | (planned) |
-| 0005 | Explicit policy functions, not Casbin | (planned) |
+| 0001 | Rust + Axum for the API | Accepted |
+| 0002 | ORM stance: sqlx for prod, Drizzle/SQLite for the on-ramp | Accepted |
+| 0003 | Money: i64 cents + $21B ceiling, never floats | Accepted |
+| 0004 | Dual-mode auth: cookies for web, JWT for API | Accepted |
+| 0005 | Explicit policy functions, not Casbin | Accepted |
+| 0006 | Outbox pattern over external broker | Accepted |
+| 0007 | Postgres RLS as belt-and-braces tenant isolation | Accepted |
+| 0008 | Stripe is the rail; our database is the source of truth | Accepted |
 
 ## Runbook Index
 
 | Incident | Runbook |
 |---|---|
-| Postgres connection storms | `docs/runbooks/postgres-connection-storms.md` (planned) |
-| Stripe webhook lag | `docs/runbooks/stripe-webhook-lag.md` (planned) |
-| 5xx spike | `docs/runbooks/5xx-spike.md` (planned) |
+| `notes-api` 5xx spike | `docs/runbooks/5xx-spike.md` |
+| Stripe webhook delivery lag | `docs/runbooks/stripe-webhook-lag.md` |
 
 ## Glossary
 
