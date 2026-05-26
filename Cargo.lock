@@ -167,6 +167,7 @@ dependencies = [
  "http",
  "jsonwebtoken",
  "rand 0.9.4",
+ "rsa",
  "serde",
  "serde_json",
  "sha2",

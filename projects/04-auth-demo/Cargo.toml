@@ -38,6 +38,7 @@ time        = "0.3"
 totp-rs     = { version = "5", default-features = false, features = ["otpauth"] }
 tower_governor = { version = "0.8", default-features = false, features = ["axum"] }
 governor    = "0.10"
+rsa         = { version = "0.9", default-features = false, features = ["std", "pem", "getrandom"] }
 
 [dev-dependencies]
 tokio = { workspace = true }

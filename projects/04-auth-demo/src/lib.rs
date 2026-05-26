@@ -3,6 +3,7 @@
 
 pub mod email_verify;
 pub mod jwt;
+pub mod jwt_rs256;
 pub mod password;
 pub mod password_reset;
 pub mod refresh_tokens;
@@ -39,6 +40,10 @@ pub struct AppState {
     pub cookie_key: Key,
     pub jwt: Arc<jwt::Jwt>,
     pub rate_limit: RateLimit,
+    /// Optional RS256 signer that backs `/.well-known/jwks.json`. When
+    /// `None`, the JWKS endpoint returns `{"keys":[]}` and the service
+    /// stays HS256-only (the default for the integration test corpus).
+    pub jwt_rs256: Option<jwt_rs256::JwtRs256>,
 }
 
 /// Per-route rate-limit budget. `0` means **disabled** for that route —
@@ -69,6 +74,7 @@ impl AppState {
             cookie_key,
             jwt: Arc::new(jwt),
             rate_limit: RateLimit::default(),
+            jwt_rs256: None,
         }
     }
 
@@ -77,6 +83,14 @@ impl AppState {
     #[must_use]
     pub fn with_rate_limit(mut self, rl: RateLimit) -> Self {
         self.rate_limit = rl;
+        self
+    }
+
+    /// Builder-style: enable the RS256 signer so `/.well-known/jwks.json`
+    /// publishes a real public key.
+    #[must_use]
+    pub fn with_jwt_rs256(mut self, j: jwt_rs256::JwtRs256) -> Self {
+        self.jwt_rs256 = Some(j);
         self
     }
 }
@@ -105,6 +119,7 @@ pub fn router(state: AppState) -> Router {
 
     Router::new()
         .route("/healthz", get(health))
+        .route("/.well-known/jwks.json", get(jwks))
         .route("/auth/register", post(register))
         .route("/auth/logout", post(logout))
         .route("/auth/refresh", post(refresh))
@@ -149,6 +164,24 @@ fn login_governor_layer(
 
 async fn health() -> Json<serde_json::Value> {
     Json(serde_json::json!({"status": "ok"}))
+}
+
+/// `GET /.well-known/jwks.json` — serves the active RS256 public keys.
+///
+/// When no RS256 signer is configured we still answer 200 with an empty
+/// key set, which is the convention: callers can read the document
+/// unconditionally and only fall back to a different verification path
+/// if `keys` is empty.
+///
+/// Production should send a long `Cache-Control: public, max-age=...`
+/// header here so downstream verifiers don't hammer it; that's wired
+/// in `main.rs` via a tower-http layer (kept out of this handler so
+/// tests can inspect the bare body).
+async fn jwks(State(s): State<AppState>) -> Json<jwt_rs256::Jwks> {
+    match s.jwt_rs256.as_ref() {
+        Some(j) => Json(j.jwks()),
+        None => Json(jwt_rs256::Jwks { keys: vec![] }),
+    }
 }
 
 // ---------------------------------------------------------------------------

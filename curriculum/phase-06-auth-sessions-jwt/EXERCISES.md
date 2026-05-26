@@ -117,11 +117,22 @@ modify `POST /auth/login` to require a second step when 2FA is enabled.
 
 ---
 
-## E6.5 — Bump JWT from HS256 to RS256 (Stretch)
+## E6.5 — Bump JWT from HS256 to RS256 (Stretch) — shipped
 
 Generate an RSA keypair at startup (`rsa` crate or `ring`). Change `Algorithm`
 and `EncodingKey`/`DecodingKey`. Add a `/.well-known/jwks.json` endpoint that
 serves the public key as a JWK. Add a `kid` to the JWT header.
+
+A reference implementation lives in `projects/04-auth-demo/src/jwt_rs256.rs`
+(2048-bit RSA keygen, PKCS#8 PEM round-trip, RFC 7517 JWK serialization,
+sha-256-of-modulus `kid` so the same key file always yields the same id) and
+`projects/04-auth-demo/tests/jwt_rs256.rs` plus 5 unit tests in the source
+module. The HS256 path (`src/jwt.rs`) is left alone — RS256 is opt-in via
+`AppState::with_jwt_rs256(JwtRs256)`, and the `/.well-known/jwks.json` route
+serves an empty `{"keys":[]}` when no RS256 signer is configured. The
+round-trip integration test rebuilds the public key from the JWK published on
+the wire and verifies a token end-to-end through it — exactly what a
+downstream service would do.
 
 <details><summary>Hints</summary>
 
