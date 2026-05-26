@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "projects/01-hello-cli",
+    "projects/02-quote-generator",
 ]
 
 [workspace.package]
@@ -21,6 +22,12 @@ clap        = { version = "4.6", features = ["derive"] }
 anyhow      = "1.0"
 thiserror   = "2.0"
 
+# Async runtime + HTTP
+tokio    = { version = "1.51", features = ["macros", "rt-multi-thread", "time", "signal", "sync", "fs", "io-util"] }
+reqwest  = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
+futures  = "0.3"
+humantime = "2.2"
+
 # Logging / tracing
 tracing             = "0.1"
 tracing-subscriber  = { version = "0.3", features = ["env-filter", "fmt"] }
@@ -29,6 +36,7 @@ tracing-subscriber  = { version = "0.3", features = ["env-filter", "fmt"] }
 assert_cmd  = "2.2"
 predicates  = "3.1"
 tempfile    = "3.27"
+wiremock    = "0.6"
 
 [profile.dev]
 opt-level    = 0
