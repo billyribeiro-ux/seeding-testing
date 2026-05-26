@@ -1,0 +1,10 @@
+---
+source: projects/03-notes-api/tests/snapshot.rs
+expression: body
+---
+{
+  "detail": "note 999 not found",
+  "status": 404,
+  "title": "Not Found",
+  "type": "https://memberclub.test/problems/not-found"
+}

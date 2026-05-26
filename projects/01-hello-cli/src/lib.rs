@@ -162,3 +162,25 @@ mod tests {
         assert_eq!(s.render(c), "      4       6");
     }
 }
+
+#[cfg(test)]
+mod prop {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        /// `Counts::count` must agree with `str::chars().count()` for every UTF-8 input.
+        #[test]
+        fn chars_matches_string(s in ".{0,256}") {
+            let c = Counts::count(&s);
+            prop_assert_eq!(c.chars, s.chars().count());
+        }
+
+        /// Word count is bounded above by the number of whitespace tokens.
+        #[test]
+        fn words_le_split_whitespace(s in ".{0,256}") {
+            let c = Counts::count(&s);
+            prop_assert_eq!(c.words, s.split_whitespace().count());
+        }
+    }
+}

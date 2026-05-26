@@ -1,0 +1,10 @@
+---
+source: projects/03-notes-api/tests/snapshot.rs
+expression: body
+---
+{
+  "detail": "body cannot be empty",
+  "status": 400,
+  "title": "Bad Request",
+  "type": "https://memberclub.test/problems/invalid-input"
+}

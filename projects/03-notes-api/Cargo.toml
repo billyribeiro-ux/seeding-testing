@@ -10,6 +10,10 @@ description = "Phase 4 capstone — a real Axum CRUD service over the sqlx-notes
 name = "notes-api"
 path = "src/main.rs"
 
+[[bin]]
+name = "notes-seed"
+path = "src/bin/notes-seed.rs"
+
 [lib]
 path = "src/lib.rs"
 
@@ -25,6 +29,9 @@ tracing    = { workspace = true }
 tracing-subscriber = { workspace = true }
 thiserror  = { workspace = true }
 anyhow     = { workspace = true }
+clap       = { workspace = true }
+fake       = { workspace = true }
+rand       = { workspace = true }
 sqlx       = { workspace = true, features = ["runtime-tokio", "tls-rustls", "sqlite", "macros", "migrate"] }
 chrono     = { workspace = true }
 uuid       = { workspace = true }
@@ -34,6 +41,8 @@ sqlx-notes = { path = "../02c-sqlx-notes" }
 tokio = { workspace = true }
 tower = { workspace = true, features = ["util"] }
 http-body-util = "0.1"
+insta = { workspace = true, features = ["json"] }
+proptest = { workspace = true }
 
 [lints.rust]
 unsafe_code = "forbid"

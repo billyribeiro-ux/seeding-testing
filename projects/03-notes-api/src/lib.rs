@@ -6,6 +6,8 @@
 //! The HTTP layer is deliberately thin: parse, call the lib, map errors to
 //! problem-details. Business logic lives in `sqlx-notes`.
 
+pub mod seed;
+
 use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};
