@@ -1,6 +1,7 @@
 //! auth-demo — argon2 password hashing + signed session cookies + RS256 JWT,
 //! demonstrating the enterprise dual-mode authentication pattern.
 
+pub mod email_verify;
 pub mod jwt;
 pub mod password;
 pub mod sessions;
@@ -62,6 +63,8 @@ pub fn router(state: AppState) -> Router {
         .route("/auth/totp/enroll", post(totp_enroll))
         .route("/auth/totp/confirm", post(totp_confirm))
         .route("/auth/totp/disable", post(totp_disable))
+        .route("/auth/verify-email/request", post(verify_email_request))
+        .route("/auth/verify-email/confirm", post(verify_email_confirm))
         .route("/me", get(me))
         .with_state(state)
 }
@@ -140,6 +143,8 @@ pub enum ApiError {
     TotpAlreadyEnabled,
     #[error("totp is not enabled for this account")]
     TotpNotEnabled,
+    #[error("verification link is invalid, expired, or already used")]
+    InvalidVerificationToken,
     #[error(transparent)]
     Db(#[from] sqlx::Error),
     #[error("password hashing failure: {0}")]
@@ -163,7 +168,8 @@ impl IntoResponse for ApiError {
             ApiError::InvalidCredentials
             | ApiError::Unauthorized
             | ApiError::TotpRequired
-            | ApiError::InvalidTotp => (
+            | ApiError::InvalidTotp
+            | ApiError::InvalidVerificationToken => (
                 StatusCode::UNAUTHORIZED,
                 "https://memberclub.test/problems/unauthorized",
                 "Unauthorized",
@@ -470,6 +476,75 @@ async fn totp_disable(
     totp::disable(&s.pool, user.0.id).await?;
     audit(&s.pool, Some(user.0.id), "totp.disabled", None).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+// ---------------------------------------------------------------------------
+// Email verification handlers (Phase 6.4)
+// ---------------------------------------------------------------------------
+
+/// TTL for an email-verification token. 24 hours is the conventional
+/// "click the link in your inbox" window.
+const EMAIL_VERIFY_TTL_SECS: i64 = 60 * 60 * 24;
+
+/// Request a new email-verification token for the authenticated user.
+///
+/// In production this endpoint would email the link to the user and
+/// respond with `{"sent": true}` so the response body never carries the
+/// secret. In dev/test builds (`debug_assertions`) we additionally
+/// include the plaintext token in the response so integration tests can
+/// drive the confirm endpoint without an inbox.
+///
+/// Calling this endpoint a second time invalidates any previous unused
+/// tokens for the same user — see [`email_verify::issue`].
+#[tracing::instrument(skip(s, user))]
+async fn verify_email_request(
+    State(s): State<AppState>,
+    user: AuthenticatedUser,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let token = email_verify::issue(&s.pool, user.0.id, EMAIL_VERIFY_TTL_SECS).await?;
+    audit(
+        &s.pool,
+        Some(user.0.id),
+        "user.email_verification_requested",
+        None,
+    )
+    .await?;
+
+    // In a real deployment, hand the token to the mail sender here and
+    // respond with just `{"sent": true}`. In debug builds we leak the
+    // token in the response body so tests don't need an SMTP server.
+    if cfg!(debug_assertions) {
+        Ok(Json(serde_json::json!({
+            "sent": true,
+            "token": token,
+        })))
+    } else {
+        // Token is intentionally discarded in release builds — the mailer
+        // would have consumed it. We drop it explicitly to make that
+        // intent visible (and to avoid an unused-variable warning).
+        drop(token);
+        Ok(Json(serde_json::json!({ "sent": true })))
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct VerifyEmailConfirmBody {
+    pub token: String,
+}
+
+/// Confirm an email-verification token. No authentication required —
+/// the token itself is the credential. On success the user's
+/// `is_email_verified` flag is flipped to 1 in the same transaction
+/// that consumes the token and writes the audit-log row.
+#[tracing::instrument(skip(s, body))]
+async fn verify_email_confirm(
+    State(s): State<AppState>,
+    Json(body): Json<VerifyEmailConfirmBody>,
+) -> Result<StatusCode, ApiError> {
+    match email_verify::confirm(&s.pool, &body.token).await? {
+        Some(_user_id) => Ok(StatusCode::NO_CONTENT),
+        None => Err(ApiError::InvalidVerificationToken),
+    }
 }
 
 // ---------------------------------------------------------------------------
