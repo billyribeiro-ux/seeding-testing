@@ -5,6 +5,8 @@
 //!   * E4.6 — `TimeoutLayer` kicks in after 5 s (exercised here with
 //!     a router built directly so we don't have to actually wait
 //!     five seconds in CI).
+//!   * E4.8 — malformed JSON maps to 400 problem-details (not axum's
+//!     default plain-text 415/422).
 
 use std::time::Duration;
 
@@ -190,6 +192,71 @@ async fn problem_details_body_carries_request_id() {
         body["request_id"].as_str(),
         Some(req_id),
         "problem-details body must echo x-request-id so the client can pivot to the trace"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// E4.8 — JSON rejection mapped to problem-details
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn malformed_json_body_returns_400_problem_details() {
+    let res = app()
+        .await
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/notes")
+                .header(header::CONTENT_TYPE, "application/json")
+                // Trailing comma + missing close brace — syntax error.
+                .body(Body::from(r#"{"body": "hi","#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        res.headers().get(header::CONTENT_TYPE).unwrap(),
+        "application/problem+json",
+        "malformed JSON must come back as application/problem+json, not the default text/plain"
+    );
+    let body = read_json(res.into_body()).await;
+    assert_eq!(body["status"], 400);
+    assert!(
+        body["type"]
+            .as_str()
+            .unwrap()
+            .contains("/problems/bad-json"),
+        "problem type must specifically name bad-json"
+    );
+}
+
+#[tokio::test]
+async fn missing_content_type_returns_400_problem_details() {
+    // No Content-Type header. axum's default Json<T> rejects with 415
+    // plain-text; our wrapper turns it into a 400 problem-details.
+    let res = app()
+        .await
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/notes")
+                .body(Body::from(r#"{"body":"hi"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        res.headers().get(header::CONTENT_TYPE).unwrap(),
+        "application/problem+json"
+    );
+    let body = read_json(res.into_body()).await;
+    assert!(
+        body["type"]
+            .as_str()
+            .unwrap()
+            .contains("/problems/bad-json")
     );
 }
 

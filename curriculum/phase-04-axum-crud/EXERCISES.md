@@ -220,9 +220,18 @@ For the snapshot test, use `insta::assert_json_snapshot!` against `ApiDoc::opena
 
 ---
 
-## E4.8 — Replace `Json` rejection with problem-details (Stretch)
+## E4.8 — Replace `Json` rejection with problem-details (Stretch) — shipped
 
 When a client sends malformed JSON, Axum returns plain text. Override it: when `Json<T>` extraction fails, return a `400` problem-details with a useful message. Hint: write a custom `Json<T>` extractor that wraps the built-in and remaps rejections.
+
+Reference implementation: `JsonBody<T>` extractor in
+`projects/03-notes-api/src/lib.rs` — wraps `axum::Json::<T>::from_request`
+and matches each `JsonRejection` variant (JsonDataError, JsonSyntaxError,
+MissingJsonContentType, BytesRejection, …) into `ApiError::BadJson(msg)`.
+Routes swap `Json<T>` for `JsonBody<T>` and inherit the consistent
+problem-details shape. Two new tests in `tests/router_extras.rs` cover
+malformed JSON syntax → 400 + /problems/bad-json AND missing content-type
+header → same 400 + /problems/bad-json (previously a 415 plain-text).
 
 <details><summary>Answer (sketch)</summary>
 

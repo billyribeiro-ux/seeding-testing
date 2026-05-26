@@ -18,7 +18,8 @@ pub mod seed;
 use std::sync::Arc;
 use std::time::Instant;
 
-use axum::extract::{MatchedPath, Path, Query, Request, State};
+use axum::extract::rejection::JsonRejection;
+use axum::extract::{FromRequest, MatchedPath, Path, Query, Request, State};
 use axum::http::StatusCode;
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
@@ -360,7 +361,7 @@ pub struct CreateBody {
 #[tracing::instrument(skip(s, body), fields(body_len = body.body.len()))]
 async fn create_note(
     State(s): State<Arc<AppState>>,
-    Json(body): Json<CreateBody>,
+    JsonBody(body): JsonBody<CreateBody>,
 ) -> Result<(StatusCode, Json<NoteDto>), ApiError> {
     if body.body.len() > MAX_BODY_BYTES {
         return Err(ApiError::PayloadTooLarge(body.body.len()));
@@ -387,7 +388,7 @@ pub struct UpdateBody {
 async fn update_note(
     State(s): State<Arc<AppState>>,
     Path(id): Path<i64>,
-    Json(payload): Json<UpdateBody>,
+    JsonBody(payload): JsonBody<UpdateBody>,
 ) -> Result<Json<NoteDto>, ApiError> {
     if payload.body.len() > MAX_BODY_BYTES {
         return Err(ApiError::PayloadTooLarge(payload.body.len()));
@@ -448,6 +449,41 @@ pub enum ApiError {
     /// here means clippy doesn't have to scan a 50 MiB POST.
     #[error("payload too large: {0} bytes (max {MAX_BODY_BYTES})")]
     PayloadTooLarge(usize),
+
+    /// Phase 4 — E4.8. The client sent something the JSON parser
+    /// (or one of its content-type / body checks) refused. We carry
+    /// the underlying reason so the problem-details body can tell
+    /// the developer what went wrong, but with a stable status (400)
+    /// instead of axum's default plain-text 415/422.
+    #[error("invalid JSON: {0}")]
+    BadJson(String),
+}
+
+/// Phase 4 — E4.8. A drop-in for `axum::Json<T>` that converts every
+/// extractor rejection into our `ApiError::BadJson(_)` so the response
+/// is the same RFC 7807 problem-details shape as every other error in
+/// this service. Without this wrapper, axum returns a plain-text body
+/// for malformed JSON, missing content-type, etc. — inconsistent with
+/// the contract.
+pub struct JsonBody<T>(pub T);
+
+impl<S, T> FromRequest<S> for JsonBody<T>
+where
+    S: Send + Sync,
+    T: serde::de::DeserializeOwned,
+{
+    type Rejection = ApiError;
+
+    async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
+        match Json::<T>::from_request(req, state).await {
+            Ok(Json(v)) => Ok(JsonBody(v)),
+            Err(JsonRejection::JsonDataError(e)) => Err(ApiError::BadJson(e.body_text())),
+            Err(JsonRejection::JsonSyntaxError(e)) => Err(ApiError::BadJson(e.body_text())),
+            Err(JsonRejection::MissingJsonContentType(e)) => Err(ApiError::BadJson(e.body_text())),
+            Err(JsonRejection::BytesRejection(e)) => Err(ApiError::BadJson(e.body_text())),
+            Err(rej) => Err(ApiError::BadJson(rej.body_text())),
+        }
+    }
 }
 
 /// Max accepted size of a notes body (Phase 4 — E4.2).
@@ -500,6 +536,12 @@ impl IntoResponse for ApiError {
                     StatusCode::PAYLOAD_TOO_LARGE,
                     "Payload Too Large",
                     "https://memberclub.test/problems/payload-too-large",
+                    self.to_string(),
+                ),
+                ApiError::BadJson(_) => (
+                    StatusCode::BAD_REQUEST,
+                    "Bad Request",
+                    "https://memberclub.test/problems/bad-json",
                     self.to_string(),
                 ),
             };
