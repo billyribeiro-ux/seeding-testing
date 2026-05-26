@@ -98,6 +98,7 @@ pub fn router(state: AppState) -> Router {
         .route("/metrics", get(metrics_handler))
         .nest("/v1", v1)
         .with_state(shared)
+        .layer(middleware::from_fn(inject_request_id_into_problem_details))
         .layer(middleware::from_fn(record_metrics))
         // Phase 4 — E4.6: kill any handler that doesn't respond within
         // 5 s. The tower-http layer returns 408 Request Timeout. We
@@ -139,6 +140,54 @@ async fn metrics_handler(State(s): State<Arc<AppState>>) -> impl IntoResponse {
 
 /// Record `http_requests_total` and `http_request_duration_seconds` for every
 /// non-`/metrics` request. The label set is intentionally bounded:
+/// Phase 4 — E4.4. After a handler runs, if the response is an RFC 7807
+/// problem-details body, splice the request's `x-request-id` into the
+/// JSON as a top-level field. The whole point: when a customer reports
+/// "I got a 500 around 10:42", they can paste back the `request_id`
+/// from the problem-details body and we can pivot straight to the
+/// trace.
+///
+/// We only touch responses where the upstream `SetRequestIdLayer` has
+/// already provided a request id (always, in practice) AND the
+/// content-type begins with `application/problem+json`. Everything
+/// else is forwarded byte-for-byte.
+async fn inject_request_id_into_problem_details(req: Request, next: Next) -> Response {
+    let req_id = req
+        .headers()
+        .get("x-request-id")
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_owned);
+    let response = next.run(req).await;
+
+    let Some(req_id) = req_id else {
+        return response;
+    };
+    let is_problem = response
+        .headers()
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|ct| ct.starts_with("application/problem+json"));
+    if !is_problem {
+        return response;
+    }
+
+    let (parts, body) = response.into_parts();
+    let Ok(bytes) = axum::body::to_bytes(body, 64 * 1024).await else {
+        // Body too large to buffer or stream error — forward an empty
+        // body rather than panic. In practice problem-details bodies
+        // are <1 KiB; this branch is a safety hatch.
+        return Response::from_parts(parts, axum::body::Body::empty());
+    };
+    let Ok(mut json) = serde_json::from_slice::<serde_json::Value>(&bytes) else {
+        // The body claimed application/problem+json but isn't valid
+        // JSON — pass it through unchanged.
+        return Response::from_parts(parts, axum::body::Body::from(bytes));
+    };
+    json["request_id"] = serde_json::Value::String(req_id);
+    let new_bytes = serde_json::to_vec(&json).unwrap_or_default();
+    Response::from_parts(parts, axum::body::Body::from(new_bytes))
+}
+
 /// `route` is the *matched-path template* (`/v1/notes/{id}`, not the
 /// concrete URI); `method` is the HTTP verb; `status_class` is one of
 /// `1xx`/`2xx`/`3xx`/`4xx`/`5xx`. Three labels with small cardinality —

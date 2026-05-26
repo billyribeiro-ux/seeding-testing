@@ -1,6 +1,7 @@
-//! Integration tests for the three smaller Phase 4 router additions:
+//! Integration tests for the smaller Phase 4 router additions:
 //!   * E4.1 — `GET /version` carries crate version + git SHA.
 //!   * E4.2 — `POST /v1/notes` rejects bodies over 8 KiB with 413.
+//!   * E4.4 — problem-details bodies echo `x-request-id`.
 //!   * E4.6 — `TimeoutLayer` kicks in after 5 s (exercised here with
 //!     a router built directly so we don't have to actually wait
 //!     five seconds in CI).
@@ -155,4 +156,64 @@ async fn timeout_layer_returns_408_when_handler_runs_past_budget() {
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::REQUEST_TIMEOUT);
+}
+
+// ---------------------------------------------------------------------------
+// E4.4 — request_id echoed in problem-details
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn problem_details_body_carries_request_id() {
+    // Drive a 404 so we get a problem-details body, with an explicit
+    // x-request-id header that we expect to see echoed back.
+    let req_id = "test-request-id-e4.4";
+    let res = app()
+        .await
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/notes/99999")
+                .header("x-request-id", req_id)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    assert_eq!(
+        res.headers().get(header::CONTENT_TYPE).unwrap(),
+        "application/problem+json"
+    );
+
+    let body = read_json(res.into_body()).await;
+    assert_eq!(
+        body["request_id"].as_str(),
+        Some(req_id),
+        "problem-details body must echo x-request-id so the client can pivot to the trace"
+    );
+}
+
+#[tokio::test]
+async fn success_responses_are_not_touched_by_the_request_id_middleware() {
+    // The middleware only mutates application/problem+json bodies.
+    // Confirm a normal 200 (JSON) goes through unchanged AND has no
+    // injected request_id field (which would be wrong shape).
+    let res = app()
+        .await
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/notes")
+                .header("x-request-id", "should-not-leak-into-200-body")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body = read_json(res.into_body()).await;
+    assert!(
+        body.get("request_id").is_none(),
+        "200 responses must not be mutated — request_id only belongs in problem-details bodies"
+    );
 }

@@ -93,9 +93,17 @@ Then in `notes-api` reduce `update_note` to `sqlx_notes::update(&s.pool, id, &pa
 
 ---
 
-## E4.4 — Echo the request id in problem-details (Medium)
+## E4.4 — Echo the request id in problem-details (Medium) — shipped
 
 When an error response is generated, include the `x-request-id` from the request as a top-level `request_id` field in the problem-details body. Hint: implement a custom extractor for `RequestId` or extract from `req.headers()` in the layer.
+
+Reference implementation: `inject_request_id_into_problem_details` middleware
+in `projects/03-notes-api/src/lib.rs`. Runs AFTER the handler; reads
+`x-request-id` from the request, then — and only if the response carries
+`application/problem+json` — buffers the body, parses it as JSON, splices
+`request_id` as a top-level field, and re-serializes. Successful responses
+go through untouched (proven by a test). The pattern is `axum::middleware::from_fn`
+so it composes with the rest of the layer stack.
 
 <details><summary>Answer (sketch)</summary>
 
