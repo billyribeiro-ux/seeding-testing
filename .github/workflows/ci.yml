@@ -114,30 +114,37 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
   # -----------------------------------------------------------------
-  # SvelteKit (becomes a real job at Phase 9; placeholder until then).
+  # SvelteKit projects. Matrix over every package.json under projects/
+  # and apps/. Each entry runs install + check + test + build.
   # -----------------------------------------------------------------
   web:
-    name: web (sveltekit)
+    name: web — ${{ matrix.dir }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    if: hashFiles('apps/memberclub/web/package.json') != ''
+    strategy:
+      fail-fast: false
+      matrix:
+        dir:
+          - projects/02b-sqlite-notes-svelte
+          # apps/memberclub/web is added at Phase 9
+    if: hashFiles(format('{0}/package.json', matrix.dir)) != ''
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: pnpm
-          cache-dependency-path: apps/memberclub/web/pnpm-lock.yaml
-      - uses: pnpm/action-setup@v4
-        with: { version: 10 }
+          cache-dependency-path: ${{ matrix.dir }}/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-        working-directory: apps/memberclub/web
+        working-directory: ${{ matrix.dir }}
       - run: pnpm check
-        working-directory: apps/memberclub/web
+        working-directory: ${{ matrix.dir }}
       - run: pnpm test
-        working-directory: apps/memberclub/web
+        working-directory: ${{ matrix.dir }}
       - run: pnpm build
-        working-directory: apps/memberclub/web
+        working-directory: ${{ matrix.dir }}
 
   # -----------------------------------------------------------------
   # Single required check downstream of all of the above — branch
