@@ -34,6 +34,7 @@ use tower_http::cors::CorsLayer;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::trace::TraceLayer;
 use tracing::{Span, info_span};
+use utoipa::OpenApi;
 
 use sqlx_notes::{Note, NotesError};
 
@@ -97,6 +98,7 @@ pub fn router(state: AppState) -> Router {
         .route("/healthz", get(health))
         .route("/version", get(version))
         .route("/metrics", get(metrics_handler))
+        .route("/openapi.json", get(openapi_json))
         .nest("/v1", v1)
         .with_state(shared)
         .layer(middleware::from_fn(inject_request_id_into_problem_details))
@@ -273,6 +275,45 @@ async fn version() -> Json<Version> {
     })
 }
 
+/// Phase 4 — E4.7. Compile-time `OpenAPI` 3 document built by `utoipa`
+/// from the `#[utoipa::path]` annotations on each handler plus the
+/// `#[derive(ToSchema)]` on each DTO. A snapshot test pins the JSON so
+/// any spec drift fails CI.
+#[derive(OpenApi)]
+#[openapi(
+    info(
+        title = "notes-api",
+        version = env!("CARGO_PKG_VERSION"),
+        description = "Phase 4 capstone — Axum CRUD over the sqlx-notes data layer.",
+        license(name = "MIT OR Apache-2.0"),
+    ),
+    paths(
+        list_notes,
+        create_note,
+        get_note,
+        update_note,
+        delete_note,
+    ),
+    components(schemas(
+        NoteDto,
+        NotesPage,
+        CreateBody,
+        UpdateBody,
+        ProblemDetails,
+    )),
+    tags(
+        (name = "notes", description = "CRUD over the notes resource."),
+    ),
+)]
+pub struct ApiDoc;
+
+/// `GET /openapi.json` — serves the document. utoipa's JSON
+/// serialization is deterministic, so the snapshot test in
+/// `tests/openapi.rs` can pin it.
+async fn openapi_json() -> Json<utoipa::openapi::OpenApi> {
+    Json(ApiDoc::openapi())
+}
+
 // ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
@@ -315,12 +356,25 @@ fn decode_cursor(s: &str) -> Result<Cursor, ApiError> {
 
 /// One page of notes plus the opaque cursor a client uses to fetch the
 /// next page. `next` is `None` when the caller has reached the end.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct NotesPage {
     pub items: Vec<NoteDto>,
     pub next: Option<String>,
 }
 
+#[utoipa::path(
+    get,
+    path = "/v1/notes",
+    tag = "notes",
+    params(
+        ("limit"  = Option<u32>, Query, description = "page size, clamped to [1, 100], default 20"),
+        ("cursor" = Option<String>, Query, description = "opaque cursor from a previous `next`"),
+    ),
+    responses(
+        (status = 200, description = "one page of notes", body = NotesPage),
+        (status = 400, description = "cursor was malformed", body = ProblemDetails),
+    ),
+)]
 #[tracing::instrument(skip(s), fields(limit = ?q.limit, has_cursor = q.cursor.is_some()))]
 async fn list_notes(
     State(s): State<Arc<AppState>>,
@@ -353,11 +407,23 @@ async fn list_notes(
     }))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({"body": "remember the milk"}))]
 pub struct CreateBody {
     pub body: String,
 }
 
+#[utoipa::path(
+    post,
+    path = "/v1/notes",
+    tag = "notes",
+    request_body = CreateBody,
+    responses(
+        (status = 201, description = "the note was created", body = NoteDto),
+        (status = 400, description = "body is empty or too long", body = ProblemDetails),
+        (status = 413, description = "request body exceeded 8 KiB", body = ProblemDetails),
+    ),
+)]
 #[tracing::instrument(skip(s, body), fields(body_len = body.body.len()))]
 async fn create_note(
     State(s): State<Arc<AppState>>,
@@ -370,6 +436,16 @@ async fn create_note(
     Ok((StatusCode::CREATED, Json(NoteDto::from(note))))
 }
 
+#[utoipa::path(
+    get,
+    path = "/v1/notes/{id}",
+    tag = "notes",
+    params(("id" = i64, Path, description = "id of the note")),
+    responses(
+        (status = 200, description = "the note", body = NoteDto),
+        (status = 404, description = "no such id", body = ProblemDetails),
+    ),
+)]
 #[tracing::instrument(skip(s), fields(note_id = id))]
 async fn get_note(
     State(s): State<Arc<AppState>>,
@@ -379,11 +455,24 @@ async fn get_note(
     Ok(Json(NoteDto::from(note)))
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct UpdateBody {
     pub body: String,
 }
 
+#[utoipa::path(
+    patch,
+    path = "/v1/notes/{id}",
+    tag = "notes",
+    params(("id" = i64, Path, description = "id of the note")),
+    request_body = UpdateBody,
+    responses(
+        (status = 200, description = "the updated note", body = NoteDto),
+        (status = 400, description = "body invalid", body = ProblemDetails),
+        (status = 404, description = "no such id", body = ProblemDetails),
+        (status = 413, description = "request body exceeded 8 KiB", body = ProblemDetails),
+    ),
+)]
 #[tracing::instrument(skip(s, payload), fields(note_id = id, body_len = payload.body.len()))]
 async fn update_note(
     State(s): State<Arc<AppState>>,
@@ -399,6 +488,16 @@ async fn update_note(
     Ok(Json(NoteDto::from(note)))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/v1/notes/{id}",
+    tag = "notes",
+    params(("id" = i64, Path, description = "id of the note")),
+    responses(
+        (status = 204, description = "the note was deleted"),
+        (status = 404, description = "no such id", body = ProblemDetails),
+    ),
+)]
 #[tracing::instrument(skip(s), fields(note_id = id))]
 async fn delete_note(
     State(s): State<Arc<AppState>>,
@@ -412,7 +511,8 @@ async fn delete_note(
 // DTOs
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(example = json!({"id": 42, "body": "remember the milk", "created_at": "2026-05-26T10:00:00Z"}))]
 pub struct NoteDto {
     pub id: i64,
     pub body: String,
@@ -489,13 +589,23 @@ where
 /// Max accepted size of a notes body (Phase 4 — E4.2).
 pub const MAX_BODY_BYTES: usize = 8 * 1024;
 
-#[derive(Serialize)]
-struct ProblemDetails {
+/// RFC 7807 problem-details — the wire shape every error path returns.
+/// Made `pub` so utoipa can reference it from the `OpenAPI` doc.
+#[derive(Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+    "type": "https://memberclub.test/problems/not-found",
+    "title": "Not Found",
+    "status": 404,
+    "detail": "note 999 not found",
+    "request_id": "01HXYZ…"
+}))]
+pub struct ProblemDetails {
     #[serde(rename = "type")]
-    kind: &'static str,
-    title: &'static str,
-    status: u16,
-    detail: String,
+    #[schema(rename = "type")]
+    pub kind: &'static str,
+    pub title: &'static str,
+    pub status: u16,
+    pub detail: String,
 }
 
 impl IntoResponse for ApiError {

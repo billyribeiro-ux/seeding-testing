@@ -39,6 +39,7 @@ sqlx-notes = { path = "../02c-sqlx-notes" }
 metrics    = "0.24"
 metrics-exporter-prometheus = { version = "0.16", default-features = false }
 base64     = "0.22"
+utoipa     = { version = "5", features = ["axum_extras", "chrono"] }
 
 [dev-dependencies]
 tokio = { workspace = true }

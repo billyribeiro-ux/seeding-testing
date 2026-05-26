@@ -199,9 +199,27 @@ assert!(res.status().is_server_error() || res.status() == StatusCode::REQUEST_TI
 
 ---
 
-## E4.7 — Add OpenAPI via utoipa (Stretch)
+## E4.7 — Add OpenAPI via utoipa (Stretch) — shipped
 
 Add `utoipa` annotations to every handler in `notes-api`. Serve the spec at `/openapi.json` and Swagger UI at `/docs`. Add a snapshot test that asserts `openapi.json` matches a committed file (so spec drift fails CI).
+
+Reference implementation: `#[utoipa::path(...)]` on every CRUD handler in
+`projects/03-notes-api/src/lib.rs` (`list_notes`, `create_note`, `get_note`,
+`update_note`, `delete_note`) and `#[derive(utoipa::ToSchema)]` on every DTO
+(`NoteDto`, `NotesPage`, `CreateBody`, `UpdateBody`, `ProblemDetails`). The
+`ApiDoc` struct uses `#[derive(OpenApi)]` to gather paths and components;
+`/openapi.json` serves `ApiDoc::openapi()`. Two integration tests in
+`projects/03-notes-api/tests/openapi.rs` lock the contract — one walks the
+doc and asserts the structural invariants (openapi 3.x, every CRUD path
+present, every DTO schema present), the other is an `insta`
+snapshot that captures the full document so any field rename / removed
+status code / new route fails CI until consciously re-blessed.
+
+Swagger UI is not wired in this curriculum (it would add a 1 MB asset to
+the binary just to embed swagger-ui's static files); the OpenAPI doc
+itself is the unambiguous, machine-readable artifact, and `pnpm dlx
+@redocly/cli preview-docs http://localhost:3000/openapi.json` gives a
+docs preview locally without bloating the binary.
 
 <details><summary>Answer (sketch)</summary>
 
