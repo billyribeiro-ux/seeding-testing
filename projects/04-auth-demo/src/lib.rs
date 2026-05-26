@@ -4,6 +4,7 @@
 pub mod email_verify;
 pub mod jwt;
 pub mod password;
+pub mod password_reset;
 pub mod sessions;
 pub mod totp;
 
@@ -65,6 +66,8 @@ pub fn router(state: AppState) -> Router {
         .route("/auth/totp/disable", post(totp_disable))
         .route("/auth/verify-email/request", post(verify_email_request))
         .route("/auth/verify-email/confirm", post(verify_email_confirm))
+        .route("/auth/forgot-password", post(forgot_password))
+        .route("/auth/reset-password", post(reset_password))
         .route("/me", get(me))
         .with_state(state)
 }
@@ -145,6 +148,8 @@ pub enum ApiError {
     TotpNotEnabled,
     #[error("verification link is invalid, expired, or already used")]
     InvalidVerificationToken,
+    #[error("password reset link is invalid, expired, or already used")]
+    InvalidResetToken,
     #[error(transparent)]
     Db(#[from] sqlx::Error),
     #[error("password hashing failure: {0}")]
@@ -169,7 +174,8 @@ impl IntoResponse for ApiError {
             | ApiError::Unauthorized
             | ApiError::TotpRequired
             | ApiError::InvalidTotp
-            | ApiError::InvalidVerificationToken => (
+            | ApiError::InvalidVerificationToken
+            | ApiError::InvalidResetToken => (
                 StatusCode::UNAUTHORIZED,
                 "https://memberclub.test/problems/unauthorized",
                 "Unauthorized",
@@ -544,6 +550,113 @@ async fn verify_email_confirm(
     match email_verify::confirm(&s.pool, &body.token).await? {
         Some(_user_id) => Ok(StatusCode::NO_CONTENT),
         None => Err(ApiError::InvalidVerificationToken),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Password reset handlers (Phase 6.5)
+// ---------------------------------------------------------------------------
+
+/// TTL for a password-reset token. 1 hour: short enough that a stolen
+/// inbox doesn't sit on a live reset for days, long enough that a user
+/// who clicks "forgot password" before lunch can finish after.
+const PASSWORD_RESET_TTL_SECS: i64 = 60 * 60;
+
+/// Total time budget for `POST /auth/forgot-password`. We pad to this so
+/// the response time doesn't reveal whether the email is registered.
+/// 250 ms is comfortably above the argon2 hash + DB write a real
+/// reset takes; it can be tuned per deployment.
+const FORGOT_PASSWORD_TIME_BUDGET_MS: u64 = 250;
+
+#[derive(Debug, Deserialize)]
+pub struct ForgotPasswordBody {
+    pub email: String,
+}
+
+/// Request a password reset.
+///
+/// Always returns `204 No Content`, regardless of whether the email
+/// exists. The response time is padded to a fixed budget so an attacker
+/// can't distinguish "found" from "not found" by latency either.
+///
+/// Internally:
+///   * Real user → [`password_reset::issue`] mints a token, the response
+///     body (debug builds only) echoes it for test convenience.
+///   * Unknown email → no DB write, but the padding sleep still runs.
+///
+/// In dev/test builds the response body carries `{"sent": true, "token":
+/// "..."}` when the user existed; in release builds it is always an
+/// empty 204 (the token would be sent over SMTP by the mailer).
+#[tracing::instrument(skip(s, body), fields(email = %body.email))]
+async fn forgot_password(
+    State(s): State<AppState>,
+    Json(body): Json<ForgotPasswordBody>,
+) -> Result<axum::response::Response, ApiError> {
+    let started = std::time::Instant::now();
+
+    // Do the lookup. Issue a token only if the user is real; otherwise
+    // skip the DB write but spend the same wall-clock time below.
+    let mut issued: Option<(i64, String)> = None;
+    if validate_email(&body.email).is_ok()
+        && let Some(user_id) = password_reset::user_id_by_email(&s.pool, &body.email).await?
+    {
+        let token = password_reset::issue(&s.pool, user_id, PASSWORD_RESET_TTL_SECS).await?;
+        audit(
+            &s.pool,
+            Some(user_id),
+            "user.password_reset_requested",
+            None,
+        )
+        .await?;
+        issued = Some((user_id, token));
+    }
+
+    // Constant-time pad — sleep so all responses land at the same
+    // wall-clock duration regardless of which branch above ran.
+    let target = std::time::Duration::from_millis(FORGOT_PASSWORD_TIME_BUDGET_MS);
+    if let Some(rest) = target.checked_sub(started.elapsed()) {
+        tokio::time::sleep(rest).await;
+    }
+
+    // Debug builds leak the token in the response so integration tests
+    // don't need an SMTP server. Release builds always 204.
+    if cfg!(debug_assertions)
+        && let Some((_uid, token)) = issued
+    {
+        return Ok(Json(serde_json::json!({
+            "sent": true,
+            "token": token,
+        }))
+        .into_response());
+    }
+
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ResetPasswordBody {
+    pub token: String,
+    pub new_password: String,
+}
+
+/// Complete a password reset.
+///
+/// Validates the new password the same way `register` does, hashes it
+/// with argon2id, then asks [`password_reset::complete`] to perform the
+/// four-statement transaction (consume token, swap hash, revoke
+/// sessions, audit). On a miss (unknown/expired/used) the response is
+/// `401` and nothing has changed in the DB.
+#[tracing::instrument(skip(s, body))]
+async fn reset_password(
+    State(s): State<AppState>,
+    Json(body): Json<ResetPasswordBody>,
+) -> Result<StatusCode, ApiError> {
+    validate_password(&body.new_password)?;
+    let new_hash =
+        password::hash(&body.new_password).map_err(|e| ApiError::Password(e.to_string()))?;
+    match password_reset::complete(&s.pool, &body.token, &new_hash).await? {
+        Some(_user_id) => Ok(StatusCode::NO_CONTENT),
+        None => Err(ApiError::InvalidResetToken),
     }
 }
 

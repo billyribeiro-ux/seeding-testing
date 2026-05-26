@@ -77,11 +77,16 @@ async fn confirm(State(s): State<AppState>, Json(body): Json<ConfirmBody>) -> Re
 
 ---
 
-## E6.3 — Password reset (Medium)
+## E6.3 — Password reset (Medium) — shipped
 
 Same machinery as verification, plus: on successful reset, *revoke every active
 session for that user* in the same transaction. Always 204 for the request
 endpoint regardless of whether the email exists.
+
+A reference implementation lives in `projects/04-auth-demo/src/password_reset.rs`
+and `projects/04-auth-demo/tests/password_reset.rs` (10 hermetic tests covering
+the constant-time pad, the four-statement transaction, expired/replayed/unknown
+tokens, weak-password rejection, and resend invalidation).
 
 <details><summary>Answer (sketch)</summary>
 
