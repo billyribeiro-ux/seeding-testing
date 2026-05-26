@@ -5,6 +5,7 @@ members = [
     "projects/02-quote-generator",
     "projects/02c-sqlx-notes",
     "projects/03-notes-api",
+    "projects/04-auth-demo",
 ]
 
 [workspace.package]
