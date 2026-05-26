@@ -117,3 +117,29 @@ If your symptom is not here:
 | CI passes locally, fails in GHA | Different toolchain version | Pin `rust-toolchain.toml` and `actions/setup-node`. |
 | `make verify` flaky on testcontainers | Docker socket perms in CI runner | Use `services:` keyword for Postgres/Redis instead of testcontainers in CI; reserve testcontainers for local. |
 | Tests timeout in CI | Default 60s too short | `cargo nextest run --test-threads <n> --slow-timeout 90`. |
+
+## Lessons from authoring this curriculum
+
+Patterns we actually hit while shipping the projects. Capture them so the next person doesn't.
+
+| Symptom | Likely cause | First-line fix |
+|---|---|---|
+| `cargo build` says "rust-version X is incompatible with edition 2024" | edition 2024 requires Rust 1.85+ in workspace `rust-version` | Bump `rust-version = "1.85"` in `[workspace.package]`. |
+| `cargo build` says "feature `query` of axum is gated" | We turned off default features and forgot to opt back into `query` | Add `"query"` to the axum features list in workspace deps. |
+| `cargo clippy` complains about `format!(...).push_str(...)` | clippy::pedantic `format_push_string` lint | Use `write!(out, "{}", x)` after `use std::fmt::Write as _`. |
+| `cargo clippy` complains about `unnested or-patterns` | `pedantic` lint | Replace `A(X) | A(Y)` with `A(X | Y)`. |
+| `cargo clippy` complains about `double_must_use` | Function annotated `#[must_use]` returning a type that's already `#[must_use]` (e.g. `Router`) | Remove the `#[must_use]` on the function. |
+| `cargo clippy` complains about `doc_markdown` on bare names | "SQLite", "JSON", a `crate::path` in a doc-comment without backticks | Wrap in backticks (`SQLite`) — or add `doc_markdown = "allow"` for the crate if it gets noisy. |
+| `cargo clippy` complains about `wildcard_imports` in `test_support` modules | Pedantic disallows `use super::*;` | `#![allow(clippy::wildcard_imports)]` inside the test_support module. |
+| `cargo clippy` complains about `inconsistent_digit_grouping` | `2_100_000_000_00` mixes three- and two-digit groups | Use `210_000_000_000` (one consistent grouping). |
+| sqlx `thiserror::Error` macro fails on `#[from] argon2::password_hash::Error` | `argon2::password_hash::Error` doesn't implement `std::error::Error` | Carry `String::from(e.to_string())` in the variant instead of `#[from]`. |
+| Tests against `sqlite::memory:` see an empty schema | Pool created multiple connections; each got its own DB | `SqlitePoolOptions::new().max_connections(1)` for `:memory:`. |
+| pnpm "Ignored build scripts" warning leaves `better_sqlite3.node` missing | pnpm 10 sandboxes install scripts | Add to `package.json`: `"pnpm": { "onlyBuiltDependencies": ["better-sqlite3", "esbuild"] }`. |
+| `svelte-check` warns "cannot find type definition file for 'node'" | Missing `@types/node` even though `tsconfig.json` declares `types: ["node"]` | `pnpm add -D @types/node`. |
+| `axum_extra::cookie::Key::derive_from(...)` doesn't compile | Method renamed/removed | `Key::generate()` for dev; `Key::from(&64_byte_secret)` in prod (must be ≥ 64 bytes). |
+| `oneshot` integration tests deadlock when called via `assert_cmd` inside an async test | `current_thread` runtime starved | Use `tokio::task::spawn_blocking(move \|\| { bin().assert()... })` to push blocking work off the runtime. |
+| `insta::assert_json_snapshot!` fails on first run | No snapshot file exists yet | `INSTA_UPDATE=always cargo test -- snapshots_to_seed` once; commit the `.snap`. |
+| `cargo run` with `RUSTFLAGS="-D warnings"` set in CI fails on unrelated warnings | One global RUSTFLAGS applied | Scope the strict flag to clippy invocations only; not to `cargo build`. |
+| Docker daemon "not running" inside the sandboxed dev environment | The environment doesn't expose `/var/run/docker.sock` | Use the in-memory SQLite test path (see Phase 5.3); document Docker as a "when you have it" capability. |
+| sqlx-cli install via `cargo install sqlx-cli` is slow / fails on first network | Compiles from source | `cargo install --locked sqlx-cli@0.8.6 --no-default-features --features postgres,sqlite,rustls` reduces compile time. |
+| `cargo fmt --check` flags imports in alphabetical order that differ from `rustfmt`'s sort | `rustfmt` 1.95 changed group ordering | Run `cargo fmt --all` once locally and commit; CI will agree. |
