@@ -7,7 +7,7 @@ use axum_extra::extract::cookie::Key;
 use sqlx::sqlite::SqlitePoolOptions;
 use tracing_subscriber::EnvFilter;
 
-use auth_demo::{AppState, jwt::Jwt, migrate, router};
+use auth_demo::{AppState, RateLimit, jwt::Jwt, migrate, router};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -49,7 +49,16 @@ async fn main() -> anyhow::Result<()> {
         .map_or_else(|| Jwt::random_secret().to_vec(), String::into_bytes);
     let jwt = Jwt::new(&jwt_secret);
 
-    let app = router(AppState::new(pool, cookie_key, jwt));
+    // Lesson 6.7's per-IP rate limit on /auth/login. Production: 5/min.
+    // Override at boot with `AUTH_LOGIN_PER_MINUTE=N` (set to 0 to
+    // disable, e.g. behind a different rate-limit layer).
+    let login_per_minute: u32 = std::env::var("AUTH_LOGIN_PER_MINUTE")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(RateLimit::production_defaults().login_per_minute);
+    let state =
+        AppState::new(pool, cookie_key, jwt).with_rate_limit(RateLimit { login_per_minute });
+    let app = router(state);
 
     tracing::info!(%bind, "starting auth-demo");
     let listener = tokio::net::TcpListener::bind(bind).await?;

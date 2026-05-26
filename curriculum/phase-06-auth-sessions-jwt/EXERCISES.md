@@ -134,11 +134,19 @@ Real production uses pre-generated keys mounted from secrets, not per-boot gener
 
 ---
 
-## E6.6 — Rate-limit `/auth/login` (Medium)
+## E6.6 — Rate-limit `/auth/login` (Medium) — shipped
 
 Add the `tower_governor` crate. Apply a stricter limit to `/auth/login` than
 the rest of the API: 5 requests per IP per minute. Add a test that asserts the
 6th request gets `429` with a `Retry-After` header.
+
+A reference implementation lives in `projects/04-auth-demo/src/lib.rs`
+(`login_governor_layer`) and `projects/04-auth-demo/tests/login_rate_limit.rs`
+(4 hermetic tests covering the 6th-request-is-429 assertion, per-IP isolation,
+that the layer is scoped to `/auth/login`, and that disabling the limit truly
+disables it). The limit is configured via `AppState::with_rate_limit` so the
+default `AppState::new` constructor leaves it off — production wires
+`RateLimit::production_defaults()` (5/min/IP) via `main.rs`.
 
 ---
 

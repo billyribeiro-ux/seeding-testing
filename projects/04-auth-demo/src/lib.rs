@@ -9,6 +9,7 @@ pub mod sessions;
 pub mod totp;
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use axum::Json;
 use axum::Router;
@@ -18,10 +19,14 @@ use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum_extra::extract::SignedCookieJar;
 use axum_extra::extract::cookie::{Cookie, Key, SameSite};
+use governor::middleware::NoOpMiddleware;
 use rand::TryRngCore;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use thiserror::Error;
+use tower_governor::GovernorLayer;
+use tower_governor::governor::GovernorConfigBuilder;
+use tower_governor::key_extractor::SmartIpKeyExtractor;
 
 // ---------------------------------------------------------------------------
 // State
@@ -32,6 +37,28 @@ pub struct AppState {
     pub pool: SqlitePool,
     pub cookie_key: Key,
     pub jwt: Arc<jwt::Jwt>,
+    pub rate_limit: RateLimit,
+}
+
+/// Per-route rate-limit budget. `0` means **disabled** for that route —
+/// the default for tests so the existing integration suite isn't
+/// rewritten. Production wires `from_env` (or sets values explicitly).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RateLimit {
+    /// Tokens per **minute** allowed against `/auth/login`, keyed by
+    /// client IP (X-Forwarded-For, then peer IP). `0` disables.
+    pub login_per_minute: u32,
+}
+
+impl RateLimit {
+    /// The "production tight" defaults the curriculum's Lesson 6.7 names:
+    /// login → 5/min/IP. Used by `main.rs`; tests build the bare default.
+    #[must_use]
+    pub fn production_defaults() -> Self {
+        Self {
+            login_per_minute: 5,
+        }
+    }
 }
 
 impl AppState {
@@ -40,7 +67,16 @@ impl AppState {
             pool,
             cookie_key,
             jwt: Arc::new(jwt),
+            rate_limit: RateLimit::default(),
         }
+    }
+
+    /// Builder-style: attach a non-default rate limit. Used by `main.rs`
+    /// and by the dedicated rate-limit integration test.
+    #[must_use]
+    pub fn with_rate_limit(mut self, rl: RateLimit) -> Self {
+        self.rate_limit = rl;
+        self
     }
 }
 
@@ -55,10 +91,20 @@ impl FromRef<AppState> for Key {
 // ---------------------------------------------------------------------------
 
 pub fn router(state: AppState) -> Router {
+    // Build the login route in isolation so we can attach the
+    // per-IP rate-limit layer ONLY to it (a 404 elsewhere doesn't
+    // burn a login token). `route_layer` rather than `layer` is the
+    // tool here — it only fires on a matched route, not on
+    // not-found / method-not-allowed responses.
+    let login_route = Router::new().route("/auth/login", post(login));
+    let login_route = match login_governor_layer(state.rate_limit.login_per_minute) {
+        Some(layer) => login_route.route_layer(layer),
+        None => login_route,
+    };
+
     Router::new()
         .route("/healthz", get(health))
         .route("/auth/register", post(register))
-        .route("/auth/login", post(login))
         .route("/auth/logout", post(logout))
         .route("/auth/refresh", post(refresh))
         .route("/auth/totp/enroll", post(totp_enroll))
@@ -69,7 +115,35 @@ pub fn router(state: AppState) -> Router {
         .route("/auth/forgot-password", post(forgot_password))
         .route("/auth/reset-password", post(reset_password))
         .route("/me", get(me))
+        .merge(login_route)
         .with_state(state)
+}
+
+/// Build the `GovernorLayer` for `/auth/login`. Returns `None` when the
+/// limit is disabled (`per_minute == 0`).
+///
+/// Configured for **N requests / minute / IP** with a burst of N:
+/// the first N requests in quick succession all pass; the next one is
+/// `429 Too Many Requests` with a `Retry-After` header. The bucket
+/// refills one token every `60 / N` seconds.
+///
+/// Uses `SmartIpKeyExtractor`, which honors `X-Forwarded-For` then
+/// falls back to the peer IP — the correct shape for any deployment
+/// behind a load balancer.
+fn login_governor_layer(
+    per_minute: u32,
+) -> Option<GovernorLayer<SmartIpKeyExtractor, NoOpMiddleware, axum::body::Body>> {
+    if per_minute == 0 {
+        return None;
+    }
+    let refill_period = Duration::from_secs(60 / u64::from(per_minute).max(1));
+    let conf = GovernorConfigBuilder::default()
+        .period(refill_period)
+        .burst_size(per_minute)
+        .key_extractor(SmartIpKeyExtractor)
+        .finish()
+        .expect("login rate-limit governor config must be valid");
+    Some(GovernorLayer::new(conf))
 }
 
 async fn health() -> Json<serde_json::Value> {

@@ -36,6 +36,8 @@ chrono      = { workspace = true }
 base64      = "0.22"
 time        = "0.3"
 totp-rs     = { version = "5", default-features = false, features = ["otpauth"] }
+tower_governor = { version = "0.8", default-features = false, features = ["axum"] }
+governor    = "0.10"
 
 [dev-dependencies]
 tokio = { workspace = true }
