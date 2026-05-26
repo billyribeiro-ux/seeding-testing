@@ -75,3 +75,13 @@ web-test:
 # --- CI alias (what the GHA workflow runs) ---
 
 ci: verify ## Alias used by the GitHub Actions workflow
+
+# --- End-to-end demo + bootstrap ---
+
+demo: ## Spin up every Rust service, hit each with curl, prove they work
+	bash scripts/demo.sh
+
+bootstrap: ## One-shot setup of the toolchain on a fresh machine
+	bash scripts/bootstrap.sh
+
+.PHONY: demo bootstrap
