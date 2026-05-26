@@ -6,6 +6,7 @@ members = [
     "projects/02c-sqlx-notes",
     "projects/03-notes-api",
     "projects/04-auth-demo",
+    "projects/05-rbac-policy-lab",
 ]
 
 [workspace.package]
