@@ -4,9 +4,15 @@ Eight drills for `projects/03-notes-api`.
 
 ---
 
-## E4.1 — Add a `GET /version` route (Easy)
+## E4.1 — Add a `GET /version` route (Easy) — shipped
 
 Add a new route that returns `{"version": env!("CARGO_PKG_VERSION"), "git_sha": <build-time SHA>}`. Make sure it's covered by an integration test.
+
+Reference implementation: `projects/03-notes-api/build.rs` stamps the
+short `git rev-parse --short HEAD` into `GIT_SHA` (falls back to `dev`
+for vendored/published builds); `projects/03-notes-api/src/lib.rs`
+exposes `GET /version`; covered by
+`projects/03-notes-api/tests/router_extras.rs::version_route_returns_crate_version_and_git_sha`.
 
 <details><summary>Answer (sketch)</summary>
 
@@ -24,9 +30,16 @@ Use `build.rs` to set `GIT_SHA` from `git rev-parse --short HEAD`.
 
 ---
 
-## E4.2 — Validate `body` length at the handler level (Easy)
+## E4.2 — Validate `body` length at the handler level (Easy) — shipped
 
 Add a check in `create_note` and `update_note` *before* the lib call: reject any body longer than 8 KB with `413 Payload Too Large`.
+
+Reference implementation: `MAX_BODY_BYTES = 8 * 1024` constant +
+`ApiError::PayloadTooLarge(usize)` variant + handler guards in
+`projects/03-notes-api/src/lib.rs`. Two integration tests in
+`projects/03-notes-api/tests/router_extras.rs` cover the oversize-rejected
+case AND the boundary (exactly `MAX_BODY_BYTES` does NOT trigger 413,
+landing instead in the sqlx-notes char-count validation).
 
 <details><summary>Answer</summary>
 
@@ -141,9 +154,16 @@ async fn list_notes(State(s): ..., Query(q): Query<ListQuery>) -> Result<Json<Pa
 
 ---
 
-## E4.6 — Per-request timeout (Medium)
+## E4.6 — Per-request timeout (Medium) — shipped
 
 Add a 5-second `TimeoutLayer` to the router. Add an integration test that simulates a slow handler (`tokio::time::sleep(6s)`) and verifies the client receives a `503 Service Unavailable` (or `408`, depending on tower-http version).
+
+Reference implementation: `tower_http::timeout::TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, Duration::from_secs(5))`
+wired into `router()` in `projects/03-notes-api/src/lib.rs` (placed
+below the metrics middleware so a timed-out request still records a
+counter — observability for slow paths). Test in
+`projects/03-notes-api/tests/router_extras.rs::timeout_layer_returns_408_when_handler_runs_past_budget`
+uses a 100 ms budget so CI doesn't wait the full 5 s.
 
 <details><summary>Answer</summary>
 

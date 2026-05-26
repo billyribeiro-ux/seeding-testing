@@ -94,10 +94,19 @@ pub fn router(state: AppState) -> Router {
 
     Router::new()
         .route("/healthz", get(health))
+        .route("/version", get(version))
         .route("/metrics", get(metrics_handler))
         .nest("/v1", v1)
         .with_state(shared)
         .layer(middleware::from_fn(record_metrics))
+        // Phase 4 — E4.6: kill any handler that doesn't respond within
+        // 5 s. The tower-http layer returns 408 Request Timeout. We
+        // place it BELOW the metrics middleware so the timed-out call
+        // still records into our counter.
+        .layer(tower_http::timeout::TimeoutLayer::with_status_code(
+            StatusCode::REQUEST_TIMEOUT,
+            std::time::Duration::from_secs(5),
+        ))
         .layer(CompressionLayer::new())
         .layer(CorsLayer::permissive())
         .layer(PropagateRequestIdLayer::x_request_id())
@@ -196,6 +205,24 @@ async fn health() -> Json<Health> {
     })
 }
 
+/// `GET /version` — Phase 4 E4.1. Reports the crate version and the
+/// short git SHA that the binary was built from. Stays useful in
+/// incident timelines ("we deployed `<sha>` at 14:02; the 5xx spike
+/// started at 14:06") long after the rest of the running fleet has
+/// rolled forward.
+#[derive(Serialize)]
+struct Version {
+    version: &'static str,
+    git_sha: &'static str,
+}
+
+async fn version() -> Json<Version> {
+    Json(Version {
+        version: env!("CARGO_PKG_VERSION"),
+        git_sha: env!("GIT_SHA"),
+    })
+}
+
 // ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
@@ -286,6 +313,9 @@ async fn create_note(
     State(s): State<Arc<AppState>>,
     Json(body): Json<CreateBody>,
 ) -> Result<(StatusCode, Json<NoteDto>), ApiError> {
+    if body.body.len() > MAX_BODY_BYTES {
+        return Err(ApiError::PayloadTooLarge(body.body.len()));
+    }
     let note = sqlx_notes::add(&s.pool, &body.body).await?;
     Ok((StatusCode::CREATED, Json(NoteDto::from(note))))
 }
@@ -310,6 +340,9 @@ async fn update_note(
     Path(id): Path<i64>,
     Json(payload): Json<UpdateBody>,
 ) -> Result<Json<NoteDto>, ApiError> {
+    if payload.body.len() > MAX_BODY_BYTES {
+        return Err(ApiError::PayloadTooLarge(payload.body.len()));
+    }
     // sqlx-notes doesn't yet expose `update`; do an emulation here using a transaction.
     // We rely on RETURNING in a single UPDATE statement.
     let trimmed = payload.body.trim();
@@ -375,7 +408,16 @@ pub enum ApiError {
 
     #[error("invalid cursor")]
     BadCursor,
+
+    /// Phase 4 — E4.2. Rejected at the handler layer before we ever
+    /// hand the body to the lib. 8 KiB is plenty for notes; tightening
+    /// here means clippy doesn't have to scan a 50 MiB POST.
+    #[error("payload too large: {0} bytes (max {MAX_BODY_BYTES})")]
+    PayloadTooLarge(usize),
 }
+
+/// Max accepted size of a notes body (Phase 4 — E4.2).
+pub const MAX_BODY_BYTES: usize = 8 * 1024;
 
 #[derive(Serialize)]
 struct ProblemDetails {
@@ -419,6 +461,12 @@ impl IntoResponse for ApiError {
                     "Bad Request",
                     "https://memberclub.test/problems/bad-cursor",
                     "cursor is malformed or expired; refetch the first page".to_string(),
+                ),
+                ApiError::PayloadTooLarge(_) => (
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    "Payload Too Large",
+                    "https://memberclub.test/problems/payload-too-large",
+                    self.to_string(),
                 ),
             };
 
