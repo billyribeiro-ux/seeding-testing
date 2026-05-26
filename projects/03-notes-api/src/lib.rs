@@ -682,3 +682,49 @@ impl IntoResponse for ApiError {
 fn current_span() -> Span {
     Span::current()
 }
+
+// ---------------------------------------------------------------------------
+// Cursor encoding property tests (Phase 5 — E5.7)
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod cursor_proptest {
+    use super::{Cursor, decode_cursor, encode_cursor};
+    use proptest::prelude::*;
+
+    proptest! {
+        /// The whole "opaque cursor" contract: a value goes in, the same
+        /// value comes out. For every legal `i64`, encode then decode
+        /// must reconstruct the original `i` exactly.
+        #[test]
+        fn encode_decode_round_trip(i in any::<i64>()) {
+            let token = encode_cursor(&Cursor { i });
+            let decoded = decode_cursor(&token).expect("encode output must decode");
+            prop_assert_eq!(decoded.i, i);
+        }
+
+        /// Encoded cursors are base64url-no-pad — URL-safe and
+        /// shell-safe (no `+`, `/`, `=`).
+        #[test]
+        fn encoded_token_is_url_safe(i in any::<i64>()) {
+            let token = encode_cursor(&Cursor { i });
+            for ch in token.chars() {
+                prop_assert!(
+                    ch.is_ascii_alphanumeric() || ch == '-' || ch == '_',
+                    "cursor `{token}` contains non-url-safe char `{ch}`"
+                );
+            }
+        }
+
+        /// Random arbitrary strings (not produced by `encode_cursor`)
+        /// must NOT successfully decode in ways that produce confusable
+        /// id values. We assert that decode either fails cleanly OR
+        /// returns a value — never panics, never overflows.
+        #[test]
+        fn decode_never_panics_on_arbitrary_input(s in ".{0,128}") {
+            // The contract here is "no panic" — we don't care which
+            // branch fires.
+            let _ = decode_cursor(&s);
+        }
+    }
+}

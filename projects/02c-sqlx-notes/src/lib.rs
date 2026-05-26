@@ -7,6 +7,8 @@
 //! drive the library against an in-memory database, which is the same pattern we'll
 //! use against Postgres in Phase 4 (via testcontainers).
 
+pub mod factory;
+
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, SqlitePool};
 use thiserror::Error;

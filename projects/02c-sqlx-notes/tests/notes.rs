@@ -4,6 +4,7 @@
 //! Same shape we'll use against Postgres via testcontainers in Phase 4.
 
 use sqlx::sqlite::SqlitePoolOptions;
+use sqlx_notes::factory;
 use sqlx_notes::{
     NotesError, add, delete, get, list, list_keyset, migrate, parse_created_at, update,
 };
@@ -194,6 +195,27 @@ async fn update_unknown_id_returns_not_found() {
     let pool = fresh_pool().await;
     let err = update(&pool, 9999, "doesn't matter").await.unwrap_err();
     assert!(matches!(err, NotesError::NotFound(9999)));
+}
+
+// ---------------------------------------------------------------------------
+// factory — Phase 5 E5.4
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn factory_inserts_a_note_with_default_body() {
+    let pool = fresh_pool().await;
+    let n = factory::note().insert(&pool).await;
+    assert!(!n.body.is_empty(), "factory must produce a non-empty body");
+    let listed = list(&pool).await.unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].id, n.id);
+}
+
+#[tokio::test]
+async fn factory_body_override_is_respected() {
+    let pool = fresh_pool().await;
+    let n = factory::note().body("explicit").insert(&pool).await;
+    assert_eq!(n.body, "explicit");
 }
 
 #[tokio::test]

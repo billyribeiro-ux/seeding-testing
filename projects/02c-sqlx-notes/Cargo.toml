@@ -15,6 +15,10 @@ thiserror = { workspace = true }
 anyhow    = { workspace = true }
 tokio     = { workspace = true }
 chrono    = { workspace = true }
+# Powers `sqlx_notes::factory::note()` (Phase 5 — E5.4). `fake` is a
+# small dep with no proc-macro footprint, so we keep it in the default
+# build rather than hiding it behind a feature flag.
+fake      = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
@@ -28,3 +32,4 @@ pedantic = { level = "warn", priority = -1 }
 module_name_repetitions = "allow"
 must_use_candidate      = "allow"
 missing_errors_doc      = "allow"
+missing_panics_doc      = "allow"
