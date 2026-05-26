@@ -54,16 +54,30 @@ cargo clippy -p auth-demo -- -D warnings
 
 Or `make verify` from the repo root.
 
+## What ships
+
+- **Argon2id** password hashing with a sentinel-hash timing defense on
+  unknown-email logins (no enumeration).
+- **Signed HttpOnly session cookies** (`axum-extra` `SignedCookieJar`)
+  + server-side `sessions` row keyed by SHA-256 of the token.
+- **HS256 JWT access (15 min) + refresh (30 d)** tokens with a
+  `purpose` claim discriminating the two.
+- **Dual-mode `AuthenticatedUser` extractor** — Bearer first, then
+  signed cookie. Same handler signature for both.
+- **TOTP 2FA** (Phase 6.6) — enrollment, confirmation, login
+  second-factor enforcement, 8 single-use recovery codes, disable
+  with step-up. Backed by `totp-rs` (RFC 6238 SHA-1 / 6 digits /
+  30 s step / ±1 skew).
+
 ## What's deliberately *not* here (and lives in the lessons + EXERCISES)
 
-- **TOTP / 2FA** — Lesson 6.6 documents the flow; E6.4 implements it.
 - **Email verification + password reset** — Lessons 6.4 + 6.5; E6.2 / E6.3.
 - **Rate limiting + lockout** — Lesson 6.7; E6.6.
 - **RS256 + JWKS** — this demo uses HS256 for simplicity. Lesson 6.3 documents
   the RS256 production pattern; E6.5 swaps it in.
 
 Each is a focused exercise — the capstone establishes the *bones* of the auth
-service; the exercises layer on production-grade controls.
+service; the exercises layer on additional production-grade controls.
 
 ## Endpoints
 
@@ -71,7 +85,33 @@ service; the exercises layer on production-grade controls.
 |---|---|---|
 | GET | `/healthz` | Liveness |
 | POST | `/auth/register` | argon2 hash, validates email and password |
-| POST | `/auth/login` | Issues both a Set-Cookie and a `LoginResponse { access_token, refresh_token }` |
+| POST | `/auth/login` | Issues both a Set-Cookie and a `LoginResponse { access_token, refresh_token }`. If TOTP is enabled, also requires `totp` or `recovery_code` in the body |
 | POST | `/auth/logout` | Revokes the cookie session row; clears the cookie |
 | POST | `/auth/refresh` | Issues a new access + refresh pair (rotation); future exercise: reuse detection |
+| POST | `/auth/totp/enroll` | Authenticated; returns `secret`, `provisioning_uri`, and 8 single-use `recovery_codes` (shown once) |
+| POST | `/auth/totp/confirm` | Authenticated; submit the 6-digit code displayed in the authenticator app to finalize enrollment |
+| POST | `/auth/totp/disable` | Authenticated + step-up; requires a fresh 6-digit code or one recovery code |
 | GET | `/me` | Returns the authenticated user (cookie or bearer) |
+
+### Sample TOTP flow
+
+```bash
+# Register + log in once
+TOKEN=$(curl -s -X POST localhost:3001/auth/login -H 'content-type: application/json' \
+        -d '{"email":"alice@example.com","password":"correct horse battery staple"}' | jq -r .access_token)
+
+# Enroll → renders provisioning_uri as a QR code; user scans with Authy / 1Password / etc.
+curl -s -X POST localhost:3001/auth/totp/enroll -H "authorization: Bearer $TOKEN" | jq
+
+# Confirm with the 6-digit code shown in the app
+curl -i -X POST localhost:3001/auth/totp/confirm \
+    -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+    -d '{"code":"123456"}'                                   # → 204
+
+# Now every login requires the second factor:
+curl -i -X POST localhost:3001/auth/login -H 'content-type: application/json' \
+    -d '{"email":"alice@example.com","password":"correct horse battery staple"}'  # → 401 (TotpRequired)
+
+curl -i -X POST localhost:3001/auth/login -H 'content-type: application/json' \
+    -d '{"email":"alice@example.com","password":"correct horse battery staple","totp":"123456"}'  # → 200
+```

@@ -35,6 +35,7 @@ jsonwebtoken = "9"
 chrono      = { workspace = true }
 base64      = "0.22"
 time        = "0.3"
+totp-rs     = { version = "5", default-features = false, features = ["otpauth"] }
 
 [dev-dependencies]
 tokio = { workspace = true }

@@ -4,6 +4,7 @@
 pub mod jwt;
 pub mod password;
 pub mod sessions;
+pub mod totp;
 
 use std::sync::Arc;
 
@@ -58,6 +59,9 @@ pub fn router(state: AppState) -> Router {
         .route("/auth/login", post(login))
         .route("/auth/logout", post(logout))
         .route("/auth/refresh", post(refresh))
+        .route("/auth/totp/enroll", post(totp_enroll))
+        .route("/auth/totp/confirm", post(totp_confirm))
+        .route("/auth/totp/disable", post(totp_disable))
         .route("/me", get(me))
         .with_state(state)
 }
@@ -79,6 +83,16 @@ pub struct User {
     pub is_admin: i64,
     pub created_at: String,
     pub updated_at: String,
+    pub totp_secret: Option<String>,
+    pub totp_enabled: i64,
+    pub totp_last_verified_at: Option<String>,
+}
+
+impl User {
+    #[must_use]
+    pub fn has_totp(&self) -> bool {
+        self.totp_enabled == 1
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -87,6 +101,7 @@ pub struct UserDto {
     pub email: String,
     pub is_email_verified: bool,
     pub is_admin: bool,
+    pub totp_enabled: bool,
 }
 
 impl From<User> for UserDto {
@@ -96,6 +111,7 @@ impl From<User> for UserDto {
             email: u.email,
             is_email_verified: u.is_email_verified == 1,
             is_admin: u.is_admin == 1,
+            totp_enabled: u.totp_enabled == 1,
         }
     }
 }
@@ -116,6 +132,14 @@ pub enum ApiError {
     WeakPassword,
     #[error("invalid email")]
     InvalidEmail,
+    #[error("totp required for this account")]
+    TotpRequired,
+    #[error("invalid totp code")]
+    InvalidTotp,
+    #[error("totp is already enabled; disable it first to re-enroll")]
+    TotpAlreadyEnabled,
+    #[error("totp is not enabled for this account")]
+    TotpNotEnabled,
     #[error(transparent)]
     Db(#[from] sqlx::Error),
     #[error("password hashing failure: {0}")]
@@ -136,17 +160,20 @@ struct ProblemDetails {
 impl IntoResponse for ApiError {
     fn into_response(self) -> axum::response::Response {
         let (status, kind, title): (StatusCode, &'static str, &'static str) = match &self {
-            ApiError::InvalidCredentials | ApiError::Unauthorized => (
+            ApiError::InvalidCredentials
+            | ApiError::Unauthorized
+            | ApiError::TotpRequired
+            | ApiError::InvalidTotp => (
                 StatusCode::UNAUTHORIZED,
                 "https://memberclub.test/problems/unauthorized",
                 "Unauthorized",
             ),
-            ApiError::EmailAlreadyRegistered => (
+            ApiError::EmailAlreadyRegistered | ApiError::TotpAlreadyEnabled => (
                 StatusCode::CONFLICT,
-                "https://memberclub.test/problems/email-taken",
+                "https://memberclub.test/problems/conflict",
                 "Conflict",
             ),
-            ApiError::WeakPassword | ApiError::InvalidEmail => (
+            ApiError::WeakPassword | ApiError::InvalidEmail | ApiError::TotpNotEnabled => (
                 StatusCode::BAD_REQUEST,
                 "https://memberclub.test/problems/invalid-input",
                 "Bad Request",
@@ -222,7 +249,8 @@ async fn register(
 
     let user: User = sqlx::query_as::<_, User>(
         "INSERT INTO users (email, password_hash) VALUES (?, ?)
-         RETURNING id, email, password_hash, is_email_verified, is_admin, created_at, updated_at",
+         RETURNING id, email, password_hash, is_email_verified, is_admin, created_at, updated_at,
+                   totp_secret, totp_enabled, totp_last_verified_at",
     )
     .bind(&body.email)
     .bind(&hash)
@@ -241,6 +269,13 @@ async fn register(
 pub struct LoginBody {
     pub email: String,
     pub password: String,
+    /// 6-digit TOTP code. Required if the account has 2FA enabled.
+    /// Mutually exclusive with `recovery_code`.
+    #[serde(default)]
+    pub totp: Option<String>,
+    /// One-time recovery code. Consumed on use.
+    #[serde(default)]
+    pub recovery_code: Option<String>,
 }
 
 async fn login(
@@ -249,7 +284,8 @@ async fn login(
     Json(body): Json<LoginBody>,
 ) -> Result<(SignedCookieJar, Json<LoginResponse>), ApiError> {
     let user: Option<User> = sqlx::query_as::<_, User>(
-        "SELECT id, email, password_hash, is_email_verified, is_admin, created_at, updated_at
+        "SELECT id, email, password_hash, is_email_verified, is_admin, created_at, updated_at,
+                totp_secret, totp_enabled, totp_last_verified_at
          FROM users WHERE email = ?",
     )
     .bind(&body.email)
@@ -263,6 +299,20 @@ async fn login(
     };
     if !password::verify(&body.password, &user.password_hash) {
         return Err(ApiError::InvalidCredentials);
+    }
+
+    // Second factor — required iff the user has TOTP enabled.
+    if user.has_totp() {
+        let ok = if let Some(code) = body.totp.as_deref() {
+            totp::verify_and_maybe_enable(&s.pool, user.id, code).await?
+        } else if let Some(code) = body.recovery_code.as_deref() {
+            totp::consume_recovery_code(&s.pool, user.id, code).await?
+        } else {
+            return Err(ApiError::TotpRequired);
+        };
+        if !ok {
+            return Err(ApiError::InvalidTotp);
+        }
     }
 
     // Issue a session cookie.
@@ -342,6 +392,87 @@ async fn me(user: AuthenticatedUser) -> Json<UserDto> {
 }
 
 // ---------------------------------------------------------------------------
+// TOTP handlers (Phase 6.6)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Serialize)]
+pub struct TotpEnrollmentDto {
+    pub secret: String,
+    pub provisioning_uri: String,
+    /// Shown ONCE. The server only stores their hashes.
+    pub recovery_codes: Vec<String>,
+}
+
+/// Begin TOTP enrollment for the authenticated user. The response carries
+/// the secret + provisioning URI + 8 recovery codes; the client renders
+/// the URI as a QR code and shows the recovery codes once. TOTP is NOT
+/// yet enabled — the user must call `/auth/totp/confirm` with a valid
+/// code to finalize.
+async fn totp_enroll(
+    State(s): State<AppState>,
+    user: AuthenticatedUser,
+) -> Result<Json<TotpEnrollmentDto>, ApiError> {
+    if user.0.has_totp() {
+        return Err(ApiError::TotpAlreadyEnabled);
+    }
+    let art = totp::begin_enrollment(&s.pool, user.0.id, &user.0.email).await?;
+    audit(&s.pool, Some(user.0.id), "totp.enrollment_started", None).await?;
+    Ok(Json(TotpEnrollmentDto {
+        secret: art.secret_b32,
+        provisioning_uri: art.provisioning_uri,
+        recovery_codes: art.recovery_codes,
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TotpCodeBody {
+    pub code: String,
+}
+
+/// Confirm enrollment by submitting a current 6-digit code. On success,
+/// `totp_enabled` flips to true and every subsequent login requires TOTP.
+async fn totp_confirm(
+    State(s): State<AppState>,
+    user: AuthenticatedUser,
+    Json(body): Json<TotpCodeBody>,
+) -> Result<StatusCode, ApiError> {
+    if user.0.has_totp() {
+        return Err(ApiError::TotpAlreadyEnabled);
+    }
+    let ok = totp::verify_and_maybe_enable(&s.pool, user.0.id, &body.code).await?;
+    if !ok {
+        return Err(ApiError::InvalidTotp);
+    }
+    audit(&s.pool, Some(user.0.id), "totp.enabled", None).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TotpDisableBody {
+    /// Step-up: must submit a fresh 6-digit code (or a recovery code) at
+    /// disable time. Prevents a stolen session from quietly removing 2FA.
+    pub code: String,
+}
+
+async fn totp_disable(
+    State(s): State<AppState>,
+    user: AuthenticatedUser,
+    Json(body): Json<TotpDisableBody>,
+) -> Result<StatusCode, ApiError> {
+    if !user.0.has_totp() {
+        return Err(ApiError::TotpNotEnabled);
+    }
+    let ok = totp::verify_and_maybe_enable(&s.pool, user.0.id, &body.code).await?
+        || totp::consume_recovery_code(&s.pool, user.0.id, &body.code).await?;
+    if !ok {
+        return Err(ApiError::InvalidTotp);
+    }
+    totp::disable(&s.pool, user.0.id).await?;
+    audit(&s.pool, Some(user.0.id), "totp.disabled", None).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ---------------------------------------------------------------------------
 // Extractor — accepts either Authorization: Bearer ... or a signed cookie.
 // ---------------------------------------------------------------------------
 
@@ -392,7 +523,8 @@ fn bearer_from(headers: &axum::http::HeaderMap) -> Option<String> {
 
 async fn fetch_user(pool: &SqlitePool, id: i64) -> Result<Option<User>, ApiError> {
     let user = sqlx::query_as::<_, User>(
-        "SELECT id, email, password_hash, is_email_verified, is_admin, created_at, updated_at
+        "SELECT id, email, password_hash, is_email_verified, is_admin, created_at, updated_at,
+                totp_secret, totp_enabled, totp_last_verified_at
          FROM users WHERE id = ?",
     )
     .bind(id)
