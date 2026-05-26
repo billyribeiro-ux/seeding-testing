@@ -7,6 +7,8 @@ members = [
     "projects/03-notes-api",
     "projects/04-auth-demo",
     "projects/05-rbac-policy-lab",
+    "projects/06-stripe-money-lab",
+    "projects/07-webhook-receiver",
 ]
 
 [workspace.package]
