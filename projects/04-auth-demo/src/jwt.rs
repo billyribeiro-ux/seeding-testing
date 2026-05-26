@@ -61,6 +61,29 @@ impl Jwt {
         self.issue(user_id, "refresh", REFRESH_TTL_SECS)
     }
 
+    /// Like [`Self::issue_refresh`], but also returns the encoded
+    /// claims so callers can record the `jti` and `exp` in the
+    /// `refresh_tokens` table (Phase 6 stretch — E6.7).
+    pub fn issue_refresh_with_claims(
+        &self,
+        user_id: i64,
+    ) -> Result<(String, Claims), jsonwebtoken::errors::Error> {
+        let now = Utc::now().timestamp();
+        let claims = Claims {
+            iss: ISSUER.into(),
+            aud: AUDIENCE.into(),
+            sub: user_id.to_string(),
+            iat: now,
+            nbf: now,
+            exp: now + REFRESH_TTL_SECS,
+            jti: jti(),
+            purpose: "refresh".into(),
+        };
+        let header = Header::new(Algorithm::HS256);
+        let token = encode(&header, &claims, &self.enc)?;
+        Ok((token, claims))
+    }
+
     fn issue(
         &self,
         user_id: i64,

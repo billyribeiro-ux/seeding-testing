@@ -134,6 +134,18 @@ pub async fn complete(
     .execute(&mut *tx)
     .await?;
 
+    // Same logic for refresh-token families: a stolen refresh JWT
+    // outlives a session revoke, so we revoke every active refresh
+    // row in the same transaction.
+    sqlx::query(
+        "UPDATE refresh_tokens
+         SET revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+         WHERE user_id = ? AND revoked_at IS NULL",
+    )
+    .bind(user_id)
+    .execute(&mut *tx)
+    .await?;
+
     sqlx::query("INSERT INTO audit_logs (actor_id, action, detail) VALUES (?, ?, ?)")
         .bind(user_id)
         .bind("user.password_reset")

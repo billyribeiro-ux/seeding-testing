@@ -5,6 +5,7 @@ pub mod email_verify;
 pub mod jwt;
 pub mod password;
 pub mod password_reset;
+pub mod refresh_tokens;
 pub mod sessions;
 pub mod totp;
 
@@ -414,7 +415,15 @@ async fn login(
 
     // Issue access + refresh JWTs.
     let access_token = s.jwt.issue_access(user.id)?;
-    let refresh_token = s.jwt.issue_refresh(user.id)?;
+    let (refresh_token, refresh_claims) = s.jwt.issue_refresh_with_claims(user.id)?;
+
+    // Phase 6 stretch — open a new refresh-token family rooted at this
+    // login. Every later /auth/refresh chains a child onto the family;
+    // replay of any used token revokes the whole family.
+    let family_id = format!("fam_{}", random_token_b64url(12));
+    let exp =
+        chrono::DateTime::<chrono::Utc>::from_timestamp(refresh_claims.exp, 0).unwrap_or_default();
+    refresh_tokens::record_root(&s.pool, &refresh_claims.jti, user.id, &family_id, exp).await?;
 
     audit(&s.pool, Some(user.id), "user.logged_in", None).await?;
 
@@ -464,13 +473,28 @@ async fn refresh(
 ) -> Result<Json<RefreshResponse>, ApiError> {
     let claims = s.jwt.verify_refresh(&body.refresh_token)?;
     let user_id: i64 = claims.sub.parse().map_err(|_| ApiError::Unauthorized)?;
+
+    // Mint the new pair first so we have the new jti+exp to chain.
+    // If rotation fails (reuse/unknown) we simply discard the bytes;
+    // nothing has been written for them.
     let access_token = s.jwt.issue_access(user_id)?;
-    let refresh_token = s.jwt.issue_refresh(user_id)?; // rotation
-    Ok(Json(RefreshResponse {
-        access_token,
-        refresh_token,
-        expires_in: jwt::ACCESS_TTL_SECS,
-    }))
+    let (refresh_token, new_claims) = s.jwt.issue_refresh_with_claims(user_id)?;
+    let new_exp =
+        chrono::DateTime::<chrono::Utc>::from_timestamp(new_claims.exp, 0).unwrap_or_default();
+
+    match refresh_tokens::rotate(&s.pool, &claims.jti, &new_claims.jti, new_exp).await? {
+        refresh_tokens::Outcome::Ok { .. } => Ok(Json(RefreshResponse {
+            access_token,
+            refresh_token,
+            expires_in: jwt::ACCESS_TTL_SECS,
+        })),
+        // Reuse detected — the whole family is now revoked AND an audit
+        // row has been written inside `rotate`. The legitimate user
+        // and the attacker are both required to re-login.
+        refresh_tokens::Outcome::ReuseDetected | refresh_tokens::Outcome::Unknown => {
+            Err(ApiError::Unauthorized)
+        }
+    }
 }
 
 async fn me(user: AuthenticatedUser) -> Json<UserDto> {

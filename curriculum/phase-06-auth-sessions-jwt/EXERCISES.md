@@ -150,7 +150,7 @@ default `AppState::new` constructor leaves it off — production wires
 
 ---
 
-## E6.7 — Refresh-token reuse detection (Stretch)
+## E6.7 — Refresh-token reuse detection (Stretch) — shipped
 
 Persist refresh tokens in a `refresh_tokens` table (`jti, user_id, family_id,
 issued_at, used_at, parent_jti`). On every refresh call: mark the presented
@@ -159,3 +159,12 @@ presented while already used → revoke the entire family, audit-log, return 401
 
 Add tests that simulate the legitimate flow and the attack flow (an attacker
 replays a previously-used refresh).
+
+A reference implementation lives in `projects/04-auth-demo/src/refresh_tokens.rs`
+(`record_root`, `rotate`, `revoke_all_for_user`) plus the
+`UPDATE … RETURNING` atomic claim. 5 hermetic integration tests in
+`projects/04-auth-demo/tests/refresh_tokens.rs` cover: root row creation at
+login, legitimate rotation chains, the reuse-detected family-wide revoke +
+audit row, forged-jti rejection (without the false-positive audit), and the
+mirror behavior in password reset (`complete` now also revokes every active
+refresh row).
