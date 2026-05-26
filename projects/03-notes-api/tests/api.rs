@@ -245,3 +245,56 @@ async fn request_id_header_propagates() {
         .unwrap_or("");
     assert_eq!(req_id, "test-req-123");
 }
+
+#[tokio::test]
+async fn metrics_endpoint_renders_prometheus_format() {
+    let app = app().await;
+
+    // Drive a few requests so the counters have non-zero values.
+    let _ = app
+        .clone()
+        .oneshot(Request::get("/v1/notes").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let _ = app
+        .clone()
+        .oneshot(Request::get("/v1/notes").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let _ = app
+        .clone()
+        .oneshot(Request::get("/v1/notes/999").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    // Scrape.
+    let res = app
+        .oneshot(Request::get("/metrics").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    let bytes = axum::body::to_bytes(res.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let body = std::str::from_utf8(&bytes).unwrap();
+
+    // The exposition format must include both metric families…
+    assert!(
+        body.contains("http_requests_total"),
+        "metric family missing; got:\n{body}"
+    );
+    assert!(
+        body.contains("http_request_duration_seconds"),
+        "histogram missing; got:\n{body}"
+    );
+    // …labelled with bounded-cardinality fields:
+    assert!(
+        body.contains("route=\"/v1/notes\"") && body.contains("status_class=\"2xx\""),
+        "expected route + status_class labels; got:\n{body}"
+    );
+    assert!(
+        body.contains("status_class=\"4xx\""),
+        "the 404 hit should produce a 4xx counter; got:\n{body}"
+    );
+}

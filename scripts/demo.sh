@@ -82,6 +82,15 @@ ok "created note id=$note_id"
 curl -s "http://127.0.0.1:3000/v1/notes/$note_id" | head -c 120 ; echo
 curl -s -i "http://127.0.0.1:3000/v1/notes/999" | head -8
 
+# /metrics — scrape the Prometheus exposition (Phase 10 instrumentation)
+metrics_body=$(curl -s http://127.0.0.1:3000/metrics)
+if echo "$metrics_body" | grep -q '^http_requests_total{'; then
+    ok "/metrics renders Prometheus format with http_requests_total"
+    echo "$metrics_body" | grep '^http_requests_total{' | head -3 | sed 's/^/    /'
+else
+    die "/metrics did not include http_requests_total"
+fi
+
 # ----------------------------------------------------------------------------
 step "auth-demo — Phase 6"
 DATABASE_URL=sqlite::memory: APP_BIND=127.0.0.1:3001 \
