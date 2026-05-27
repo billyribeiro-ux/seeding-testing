@@ -4,20 +4,18 @@ use std::net::SocketAddr;
 
 use anyhow::Context;
 use sqlx::sqlite::SqlitePoolOptions;
-use tracing_subscriber::EnvFilter;
 
-use notes_api::{AppState, router};
+use notes_api::{AppState, router, telemetry};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("info,notes_api=debug,tower_http=info")),
-        )
-        .with_target(false)
-        .compact()
-        .init();
+    // If OTEL_EXPORTER_OTLP_ENDPOINT is set, ship spans via OTLP/gRPC
+    // (and keep fmt-on-stdout for humans). Otherwise fall back to the
+    // pre-OTel fmt-only subscriber. The guard is held for the lifetime
+    // of `main` so its Drop can flush the batch exporter before exit.
+    let otlp_endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").ok();
+    let _telemetry_guard =
+        telemetry::init(otlp_endpoint.as_deref()).context("install telemetry subscriber")?;
 
     let database_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite::memory:".into());
     let bind: SocketAddr = std::env::var("APP_BIND")

@@ -14,6 +14,7 @@
 //! Metrics are exposed at `GET /metrics` in the Prometheus exposition format.
 
 pub mod seed;
+pub mod telemetry;
 
 use std::sync::Arc;
 use std::time::Instant;

@@ -4,11 +4,15 @@
 pub mod email_verify;
 pub mod jwt;
 pub mod jwt_rs256;
+pub mod magic_link;
+pub mod oauth;
 pub mod password;
 pub mod password_reset;
 pub mod refresh_tokens;
 pub mod sessions;
 pub mod totp;
+
+use crate::oauth::OauthProvider as _;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -44,6 +48,10 @@ pub struct AppState {
     /// `None`, the JWKS endpoint returns `{"keys":[]}` and the service
     /// stays HS256-only (the default for the integration test corpus).
     pub jwt_rs256: Option<jwt_rs256::JwtRs256>,
+    /// Optional Google OAuth provider. `None` (the default) makes the
+    /// `/auth/oauth/google/*` endpoints return 404 — production wires
+    /// a real `GoogleProvider`, tests wire a wiremock-backed one.
+    pub oauth_google: Option<Arc<oauth::GoogleProvider>>,
 }
 
 /// Per-route rate-limit budget. `0` means **disabled** for that route —
@@ -75,6 +83,7 @@ impl AppState {
             jwt: Arc::new(jwt),
             rate_limit: RateLimit::default(),
             jwt_rs256: None,
+            oauth_google: None,
         }
     }
 
@@ -91,6 +100,15 @@ impl AppState {
     #[must_use]
     pub fn with_jwt_rs256(mut self, j: jwt_rs256::JwtRs256) -> Self {
         self.jwt_rs256 = Some(j);
+        self
+    }
+
+    /// Builder-style: attach a Google OAuth provider. Activates the
+    /// `/auth/oauth/google/*` endpoints. Tests inject a wiremock-backed
+    /// `GoogleProvider`; production wires the real one in `main.rs`.
+    #[must_use]
+    pub fn with_oauth_google(mut self, g: oauth::GoogleProvider) -> Self {
+        self.oauth_google = Some(Arc::new(g));
         self
     }
 }
@@ -130,6 +148,10 @@ pub fn router(state: AppState) -> Router {
         .route("/auth/verify-email/confirm", post(verify_email_confirm))
         .route("/auth/forgot-password", post(forgot_password))
         .route("/auth/reset-password", post(reset_password))
+        .route("/auth/oauth/google/start", get(oauth_google_start))
+        .route("/auth/oauth/google/callback", get(oauth_google_callback))
+        .route("/auth/magic/request", post(magic_request))
+        .route("/auth/magic/confirm", post(magic_confirm))
         .route("/me", get(me))
         .merge(login_route)
         .with_state(state)
@@ -200,6 +222,10 @@ pub struct User {
     pub totp_secret: Option<String>,
     pub totp_enabled: i64,
     pub totp_last_verified_at: Option<String>,
+    /// Google OIDC `sub` claim when the user is linked to a Google
+    /// identity. `None` for password-only users. Added in the OAuth
+    /// migration (E6.8).
+    pub google_sub: Option<String>,
 }
 
 impl User {
@@ -370,7 +396,7 @@ async fn register(
     let mut user: User = sqlx::query_as::<_, User>(
         "INSERT INTO users (email, password_hash) VALUES (?, ?)
          RETURNING id, email, password_hash, is_email_verified, is_admin, created_at, updated_at,
-                   totp_secret, totp_enabled, totp_last_verified_at",
+                   totp_secret, totp_enabled, totp_last_verified_at, google_sub",
     )
     .bind(&body.email)
     .bind(&hash)
@@ -421,7 +447,7 @@ async fn login(
 ) -> Result<(SignedCookieJar, Json<LoginResponse>), ApiError> {
     let user: Option<User> = sqlx::query_as::<_, User>(
         "SELECT id, email, password_hash, is_email_verified, is_admin, created_at, updated_at,
-                totp_secret, totp_enabled, totp_last_verified_at
+                totp_secret, totp_enabled, totp_last_verified_at, google_sub
          FROM users WHERE email = ?",
     )
     .bind(&body.email)
@@ -808,6 +834,205 @@ async fn reset_password(
 }
 
 // ---------------------------------------------------------------------------
+// OAuth (Google) handlers (Phase 6 stretch E6.8)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+pub struct OauthStartQuery {
+    /// Optional post-callback redirect target. Passed through so the
+    /// SvelteKit client can deep-link the user back to the page they
+    /// were on before they clicked "Login with Google."
+    #[serde(default)]
+    pub return_to: Option<String>,
+}
+
+/// `GET /auth/oauth/google/start?return_to=...` — kicks off the
+/// authorization-code flow. We mint a state + PKCE verifier, persist
+/// them so `/callback` can validate the round-trip, and 302 the user to
+/// Google.
+async fn oauth_google_start(
+    State(s): State<AppState>,
+    axum::extract::Query(q): axum::extract::Query<OauthStartQuery>,
+) -> Result<axum::response::Response, ApiError> {
+    let Some(google) = s.oauth_google.as_ref() else {
+        return Ok(StatusCode::NOT_FOUND.into_response());
+    };
+
+    let state = oauth::new_state();
+    let verifier = oauth::new_code_verifier();
+    oauth::store_state(
+        &s.pool,
+        &state,
+        &verifier,
+        q.return_to.as_deref(),
+        oauth::OAUTH_STATE_TTL_SECS,
+    )
+    .await?;
+
+    let url = google.authorize_url(&state, &verifier);
+    Ok(axum::response::Redirect::to(&url).into_response())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct OauthCallbackQuery {
+    pub code: String,
+    pub state: String,
+}
+
+/// `GET /auth/oauth/google/callback?code=...&state=...` — completes
+/// the authorization-code flow. Validates (and consumes) state,
+/// exchanges code for identity, find-or-creates the user keyed by
+/// `google_sub`, and lands the user back at `return_to` (or `/`) with
+/// a session cookie + JWT pair the same way `login` does.
+async fn oauth_google_callback(
+    State(s): State<AppState>,
+    jar: SignedCookieJar,
+    axum::extract::Query(q): axum::extract::Query<OauthCallbackQuery>,
+) -> Result<(SignedCookieJar, axum::response::Response), ApiError> {
+    let Some(google) = s.oauth_google.as_ref() else {
+        return Ok((jar, StatusCode::NOT_FOUND.into_response()));
+    };
+
+    // Consume state — if it's unknown / expired / already-used we 400.
+    // We never tell the wire which branch fired.
+    let Some((verifier, return_to)) = oauth::consume_state(&s.pool, &q.state).await? else {
+        return Ok((jar, StatusCode::BAD_REQUEST.into_response()));
+    };
+
+    let info = google
+        .exchange_code(&q.code, &verifier)
+        .await
+        .map_err(|e| {
+            tracing::warn!(error = %e, "oauth code exchange failed");
+            ApiError::Unauthorized
+        })?;
+
+    let user_id = oauth::find_or_create_user(&s.pool, &info).await?;
+    let user = fetch_user(&s.pool, user_id)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+
+    let (jar, _resp_body) = issue_session_and_tokens(&s, user, jar).await?;
+
+    audit(&s.pool, Some(user_id), "user.logged_in_oauth_google", None).await?;
+
+    // Land the browser on the originally-requested page.
+    let redirect_to = return_to.unwrap_or_else(|| "/".to_string());
+    Ok((
+        jar,
+        axum::response::Redirect::to(&redirect_to).into_response(),
+    ))
+}
+
+// ---------------------------------------------------------------------------
+// Magic-link (passwordless) handlers (Phase 6 stretch E6.8)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+pub struct MagicRequestBody {
+    pub email: String,
+}
+
+/// `POST /auth/magic/request { email }` — always 204 (modulo the debug
+/// token echo). Constant-time padded so latency doesn't leak whether
+/// the email is registered — same shape as `forgot_password`.
+#[tracing::instrument(skip(s, body), fields(email = %body.email))]
+async fn magic_request(
+    State(s): State<AppState>,
+    Json(body): Json<MagicRequestBody>,
+) -> Result<axum::response::Response, ApiError> {
+    let started = std::time::Instant::now();
+
+    let mut issued: Option<String> = None;
+    if validate_email(&body.email).is_ok()
+        && let Some(user_id) = magic_link::user_id_by_email(&s.pool, &body.email).await?
+    {
+        let token = magic_link::issue(&s.pool, user_id, magic_link::MAGIC_LINK_TTL_SECS).await?;
+        audit(&s.pool, Some(user_id), "user.magic_link_requested", None).await?;
+        issued = Some(token);
+    }
+
+    let target = std::time::Duration::from_millis(FORGOT_PASSWORD_TIME_BUDGET_MS);
+    if let Some(rest) = target.checked_sub(started.elapsed()) {
+        tokio::time::sleep(rest).await;
+    }
+
+    if cfg!(debug_assertions)
+        && let Some(token) = issued
+    {
+        return Ok(Json(serde_json::json!({
+            "sent": true,
+            "token": token,
+        }))
+        .into_response());
+    }
+
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MagicConfirmBody {
+    pub token: String,
+}
+
+/// `POST /auth/magic/confirm { token }` — single-uses the token and
+/// issues the same session + JWT pair as `login`, so the SvelteKit
+/// client can treat magic-link success as just-another-login.
+async fn magic_confirm(
+    State(s): State<AppState>,
+    jar: SignedCookieJar,
+    Json(body): Json<MagicConfirmBody>,
+) -> Result<(SignedCookieJar, Json<LoginResponse>), ApiError> {
+    let user_id = magic_link::confirm(&s.pool, &body.token)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+
+    let user = fetch_user(&s.pool, user_id)
+        .await?
+        .ok_or(ApiError::Unauthorized)?;
+
+    let (jar, resp) = issue_session_and_tokens(&s, user, jar).await?;
+    audit(&s.pool, Some(user_id), "user.logged_in_magic_link", None).await?;
+    Ok((jar, Json(resp)))
+}
+
+/// Issue a session cookie + an (access, refresh) JWT pair for `user`.
+/// Mirrors the tail of the password-login handler so OAuth and
+/// magic-link land users in the *same* authenticated state. Returns
+/// the updated jar plus a `LoginResponse` ready for `Json(...)`.
+async fn issue_session_and_tokens(
+    s: &AppState,
+    user: User,
+    jar: SignedCookieJar,
+) -> Result<(SignedCookieJar, LoginResponse), ApiError> {
+    let session_token = random_token_b64url(32);
+    sessions::insert(&s.pool, user.id, &session_token, 60 * 60 * 24 * 30).await?;
+    let cookie = Cookie::build(("session", session_token))
+        .http_only(true)
+        .secure(cfg!(not(debug_assertions)))
+        .same_site(SameSite::Lax)
+        .path("/")
+        .max_age(time::Duration::days(30))
+        .build();
+
+    let access_token = s.jwt.issue_access(user.id)?;
+    let (refresh_token, refresh_claims) = s.jwt.issue_refresh_with_claims(user.id)?;
+
+    let family_id = format!("fam_{}", random_token_b64url(12));
+    let exp =
+        chrono::DateTime::<chrono::Utc>::from_timestamp(refresh_claims.exp, 0).unwrap_or_default();
+    refresh_tokens::record_root(&s.pool, &refresh_claims.jti, user.id, &family_id, exp).await?;
+
+    let resp = LoginResponse {
+        user: UserDto::from(user),
+        access_token,
+        refresh_token,
+        expires_in: jwt::ACCESS_TTL_SECS,
+    };
+    Ok((jar.add(cookie), resp))
+}
+
+// ---------------------------------------------------------------------------
 // Extractor — accepts either Authorization: Bearer ... or a signed cookie.
 // ---------------------------------------------------------------------------
 
@@ -859,7 +1084,7 @@ fn bearer_from(headers: &axum::http::HeaderMap) -> Option<String> {
 async fn fetch_user(pool: &SqlitePool, id: i64) -> Result<Option<User>, ApiError> {
     let user = sqlx::query_as::<_, User>(
         "SELECT id, email, password_hash, is_email_verified, is_admin, created_at, updated_at,
-                totp_secret, totp_enabled, totp_last_verified_at
+                totp_secret, totp_enabled, totp_last_verified_at, google_sub
          FROM users WHERE id = ?",
     )
     .bind(id)

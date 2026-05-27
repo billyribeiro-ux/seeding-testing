@@ -89,3 +89,114 @@ the "Postgres defaults" section.
   [Concurrency Control](https://www.postgresql.org/docs/current/mvcc.html)
   and [Routine Database Maintenance](https://www.postgresql.org/docs/current/maintenance.html)
   are surprisingly readable once the vocabulary clicks.
+
+## Vocabulary cheat-sheet
+
+These terms recur across both files. Read this once now; refer back when
+the words don't click.
+
+- **Tuple**: one physical row-version on disk. A logical row has one or
+  more tuples (more, transiently, during MVCC updates).
+- **xmin / xmax**: the transaction IDs that created and (if any)
+  superseded a tuple. The MVCC visibility check reads them.
+- **Snapshot**: the set of transaction IDs visible to a given transaction,
+  taken at transaction or statement start.
+- **Dead tuple**: a tuple that no still-running snapshot needs.
+- **Heap**: the table's data file. "Heap fetch" = "go read the actual row."
+- **Index**: a separate data structure (almost always a B-tree) that
+  maps key → row-location.
+- **Page**: 8KB unit of disk allocation. Postgres reads and writes
+  entire pages.
+- **WAL**: the Write-Ahead Log. Sequential append-only stream of every
+  page-level change made to the database.
+- **Checkpoint**: the periodic event that flushes dirty pages to their
+  data files, freeing earlier WAL segments to be recycled or archived.
+- **VACUUM**: the housekeeping process that reclaims dead-tuple space
+  and updates the visibility map.
+- **Visibility map**: per-table bitmap indicating which pages are
+  all-visible. Powers index-only scans.
+- **Freeze**: VACUUM's act of rewriting old `xmin` values to a sentinel
+  to defend against transaction-ID wraparound.
+- **Wraparound**: the failure mode where transaction IDs overflow the
+  32-bit space and the visibility check breaks. Operationally fatal
+  if you let it happen.
+- **Index-only scan**: a query plan that reads only the index, no heap
+  fetch. Requires the visibility map to vouch for the leaf-pointed
+  heap page.
+- **MVCC**: Multi-Version Concurrency Control. The umbrella term for
+  "readers don't block writers and vice versa."
+
+## When to escalate
+
+The contents of this directory are sufficient for routine reasoning
+about Postgres. Some things are not in scope and require either a
+specialist or much more reading:
+
+- Query planner internals: cost estimation, plan stability, hint-style
+  workarounds. The planner is a separate, deep topic.
+- Replication topology design: hot standbys, cascading replication,
+  logical replication, conflict resolution.
+- Sharding: when one Postgres instance is no longer enough. Citus,
+  CockroachDB, Yugabyte. None of these are drop-in.
+- The internals of PG extensions you depend on (`pgvector`, `postgis`,
+  `pg_partman`). Each has its own quirks.
+
+If you're in any of these areas, treat this directory as background
+context and reach for the relevant primary source.
+
+## Common questions this directory will not answer
+
+- "Should I use Postgres or MySQL?" Use whichever your team knows.
+  The differences relevant to a small/medium SaaS are smaller than the
+  on-call expertise you build up running one of them.
+- "Should I switch to a NewSQL distributed database?" Almost certainly
+  not yet. The complexity tax is enormous. Cross that bridge when a
+  single Postgres can't fit your workload, which is later than you
+  think.
+- "What's the right shared_buffers setting?" Start with `pg_tune` or
+  cloud-provider defaults. Tune only after you have measurements
+  proving the default is wrong.
+- "Should I use JSONB everywhere?" No. JSONB is a tool for genuinely
+  unstructured data. Schema-less storage of structured data is a
+  recipe for inconsistencies you'll spend years cleaning up.
+
+## How the files in this directory relate to each other
+
+```
+README.md (you are here)
+  │
+  ├── 01-mvcc-and-isolation-levels.md
+  │     ├── establishes vocabulary: tuple, xmin/xmax, snapshot,
+  │     │   visibility check
+  │     ├── covers four isolation levels with worked subscriptions
+  │     │   example
+  │     └── ends with FOR UPDATE SKIP LOCKED cross-ref to outbox demo
+  │
+  └── 02-btree-wal-and-vacuum.md
+        ├── builds on the vocabulary from 01
+        ├── B-tree shape and the keyset-pagination cross-ref to
+        │   projects/03-notes-api
+        ├── WAL: durability, replication, PITR (cross-ref to DR runbook)
+        ├── VACUUM: cleanup mechanism, autovacuum, ANALYZE
+        └── XID wraparound: the operational time bomb
+```
+
+If you have an hour: read both files end-to-end.
+If you have 20 minutes: read 01 through the "Postgres defaults" section
+and skim the rest.
+If you have 5 minutes: read this README plus the worked example in 01.
+
+## A note on Postgres versions
+
+The behaviors described here apply to PostgreSQL 13 through 17.
+Behavior changes worth flagging:
+
+- PG 13 added parallel VACUUM (index cleanup phase).
+- PG 14 introduced more aggressive freezing (less wraparound risk
+  for healthy clusters).
+- PG 15 added the `MERGE` command (relevant for upsert patterns).
+- PG 16 added logical replication from standbys.
+- PG 17 (current LTS-ish) improved VACUUM efficiency further.
+
+MemberClub runs PG 16 in production. The fundamentals haven't moved
+in a decade; the operational quality-of-life keeps getting better.

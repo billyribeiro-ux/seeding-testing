@@ -185,3 +185,37 @@ login, legitimate rotation chains, the reuse-detected family-wide revoke +
 audit row, forged-jti rejection (without the false-positive audit), and the
 mirror behavior in password reset (`complete` now also revokes every active
 refresh row).
+
+---
+
+## E6.8 — OAuth + magic-link (Stretch) — shipped
+
+Add two passwordless login paths to the auth-demo: Google OAuth 2.0
+(authorization-code grant with PKCE + CSRF `state`) and magic-link email
+sign-in. Both share the same session+JWT issuer as the password login,
+so the SvelteKit client doesn't have to branch on auth method. The
+discovery URL and the token URL on `GoogleProvider` are injectable so
+the integration tests point at a wiremock `MockServer` that pretends to
+be Google — no network in CI, full coverage of the redirect dance.
+
+A reference implementation lives in `projects/04-auth-demo/src/oauth.rs`
+(PKCE + state + `find_or_create_user` keyed by `google_sub`, with a
+`GoogleProvider::with_endpoints` constructor for tests), and
+`projects/04-auth-demo/src/magic_link.rs` (one-shot tokens with
+`token_hash`/`used_at`/`expires_at`, identical to `email_verify` and
+`password_reset`). The new migration is
+`projects/04-auth-demo/migrations/20260527010000_oauth.sql` —
+`users.google_sub` (UNIQUE on non-NULL), `oauth_states`, `magic_links`.
+8 hermetic integration tests in `projects/04-auth-demo/tests/oauth.rs`
+cover: 303 redirect with `state=` on /start, /callback happy path
+creating the user and honoring `return_to`, state CSRF (unknown state →
+400), single-use state (replay → 400), no-duplicate linking when a
+password-only user already owns the email, end-to-end PKCE
+(`code_verifier` present in the captured token-exchange body), 404 when
+the provider isn't configured, and `/me` reachable with the session
+cookie after the callback. 8 more in
+`projects/04-auth-demo/tests/magic_link.rs` cover: token issued + one
+unused row, confirm returns the `LoginResponse` shape + marks `used_at`,
+replay → 401, expired → 401, unknown email → 204 with no DB write,
+malformed email → 204, constant-time pad (>= 80% of the 250 ms budget),
+and resend invalidates any prior unused tokens.

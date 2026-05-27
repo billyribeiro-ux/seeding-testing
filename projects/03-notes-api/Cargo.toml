@@ -41,6 +41,19 @@ metrics-exporter-prometheus = { version = "0.16", default-features = false }
 base64     = "0.22"
 utoipa     = { version = "5", features = ["axum_extras", "chrono"] }
 
+# OpenTelemetry / OTLP tracing.
+# Pin set chosen for the May 2026 stack:
+#   opentelemetry 0.27.x + opentelemetry_sdk 0.27.x + opentelemetry-otlp 0.27.x
+#   tracing-opentelemetry 0.28.x (the last release that pairs with opentelemetry 0.27).
+# The OTel Rust crates do a coordinated semver bump every few months and
+# tracing-opentelemetry trails by one minor — keep these four crates moving as
+# a unit when bumping. Newer 0.28+ lines exist but exercise the new SpanExporterBuilder
+# API; the 0.27 line is still the most-deployed pin across the Rust OTel ecosystem.
+opentelemetry        = { version = "0.27", features = ["trace"] }
+opentelemetry_sdk    = { version = "0.27", features = ["rt-tokio", "trace"] }
+opentelemetry-otlp   = { version = "0.27", default-features = false, features = ["grpc-tonic", "trace"] }
+tracing-opentelemetry = "0.28"
+
 [dev-dependencies]
 tokio = { workspace = true }
 tower = { workspace = true, features = ["util"] }
@@ -58,3 +71,7 @@ module_name_repetitions = "allow"
 must_use_candidate      = "allow"
 missing_errors_doc      = "allow"
 missing_panics_doc      = "allow"
+# `doc_markdown` flags "OTel", "OTLP", "RAII", etc. as unticked items.
+# The telemetry module's docs read better as prose; ticking every
+# acronym hurts readability more than it helps.
+doc_markdown            = "allow"
