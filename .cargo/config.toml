@@ -1,0 +1,7 @@
+# Cargo alias for the xtask pattern: `cargo xtask <subcommand>` runs
+# the `xtask` workspace crate's binary. See xtask/src/main.rs for the
+# subcommand catalog (verify, openapi-bless, versions, bump-version,
+# check-migrations).
+
+[alias]
+xtask = "run --quiet --package xtask --bin xtask --"

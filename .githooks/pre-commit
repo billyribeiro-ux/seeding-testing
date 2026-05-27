@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# Pre-commit hook — runs on EVERY `git commit` for this repo.
+#
+# Enabled via:
+#   git config --local core.hooksPath .githooks
+# (The devcontainer post-create.sh does this for you.)
+#
+# The hook is conservative — it ONLY checks the files staged in this
+# commit. Full clippy + tests run in CI (and via `make verify`); we
+# don't want a typo in an unrelated file to block a focused commit.
+
+set -euo pipefail
+
+# Bail early if there are no staged changes (e.g. `git commit --allow-empty`).
+if git diff --cached --quiet; then
+    exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Rust: fmt + clippy
+# ---------------------------------------------------------------------------
+
+staged_rust=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.rs$' || true)
+if [ -n "$staged_rust" ]; then
+    echo "==> cargo fmt --check on staged Rust files"
+    # Fast path: just check the staged files. Format violations get a
+    # one-line suggested fix.
+    if ! echo "$staged_rust" | xargs rustfmt --edition 2024 --check 2>&1; then
+        echo
+        echo "✗ rustfmt failed. Fix with: cargo fmt --all"
+        exit 1
+    fi
+
+    echo "==> cargo clippy on touched workspace members"
+    # Map each staged file back to the crate it belongs to, dedupe.
+    crates=$(echo "$staged_rust" \
+        | xargs -I{} sh -c 'dirname {} | sed -E "s|^(projects/[^/]+).*|\\1|; s|^(apps/[^/]+/[^/]+).*|\\1|"' \
+        | sort -u)
+    for crate_dir in $crates; do
+        if [ -f "$crate_dir/Cargo.toml" ]; then
+            pkg=$(awk -F '"' '/^name\s*=/{print $2; exit}' "$crate_dir/Cargo.toml")
+            if [ -n "$pkg" ]; then
+                echo "    clippy -p $pkg"
+                cargo clippy --quiet -p "$pkg" --all-targets -- -D warnings
+            fi
+        fi
+    done
+fi
+
+# ---------------------------------------------------------------------------
+# SQL migrations: forbid editing a previously-applied migration. New SQL
+# files are fine.
+# ---------------------------------------------------------------------------
+
+touched_migrations=$(git diff --cached --name-only --diff-filter=M | grep -E 'migrations/.*\.sql$' || true)
+if [ -n "$touched_migrations" ]; then
+    echo "✗ refusing to commit edits to existing migration files:"
+    echo "$touched_migrations" | sed 's/^/    /'
+    echo
+    echo "  Migrations are immutable once shipped. Add a NEW timestamped"
+    echo "  file that reverses or amends the existing one."
+    exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Secrets: refuse to commit anything that looks like a Stripe key,
+# JWT secret, or private RSA key.
+# ---------------------------------------------------------------------------
+
+staged_all=$(git diff --cached --name-only --diff-filter=ACMR || true)
+if [ -n "$staged_all" ]; then
+    # Diff content (not whole files — only the new lines being committed).
+    secret_pattern='(sk_live_[a-zA-Z0-9]+|sk_test_[a-zA-Z0-9]{20,}|whsec_[a-zA-Z0-9]{20,}|BEGIN RSA PRIVATE KEY|BEGIN PRIVATE KEY)'
+    if git diff --cached -U0 | grep -E "$secret_pattern" >/dev/null; then
+        echo "✗ refusing to commit what looks like a secret (Stripe key,"
+        echo "  webhook secret, or private RSA key). Move it to .env or"
+        echo "  a secrets store; verify with: git diff --cached"
+        exit 1
+    fi
+fi
+
+echo "✓ pre-commit checks passed"

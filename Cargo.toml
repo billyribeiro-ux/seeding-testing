@@ -15,6 +15,7 @@ members = [
     "projects/12-multi-tenant-rls",
     "projects/13-load-test",
     "apps/memberclub/api",
+    "xtask",
 ]
 
 [workspace.package]

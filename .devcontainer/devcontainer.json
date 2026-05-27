@@ -1,0 +1,60 @@
+{
+  "name": "seeding-testing",
+  "image": "mcr.microsoft.com/devcontainers/rust:1-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "27"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "remoteEnv": {
+    "RUST_LOG": "info",
+    "CARGO_TERM_COLOR": "always"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "vadimcn.vscode-lldb",
+        "svelte.svelte-vscode",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "GitHub.vscode-pull-request-github",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "[rust]": {
+          "editor.defaultFormatter": "rust-lang.rust-analyzer",
+          "editor.formatOnSave": true
+        },
+        "[svelte]": {
+          "editor.defaultFormatter": "svelte.svelte-vscode",
+          "editor.formatOnSave": true
+        },
+        "rust-analyzer.check.command": "clippy",
+        "files.watcherExclude": {
+          "**/target/**": true,
+          "**/node_modules/**": true
+        }
+      }
+    }
+  },
+  "forwardPorts": [3000, 3001, 5173, 5432, 6379],
+  "portsAttributes": {
+    "3000": { "label": "web (svelte adapter-node)", "onAutoForward": "notify" },
+    "3001": { "label": "memberclub-api", "onAutoForward": "notify" },
+    "5173": { "label": "vite dev", "onAutoForward": "notify" },
+    "5432": { "label": "postgres", "onAutoForward": "silent" },
+    "6379": { "label": "redis", "onAutoForward": "silent" }
+  },
+  "mounts": [
+    "source=cargo-target,target=${containerWorkspaceFolder}/target,type=volume",
+    "source=cargo-registry,target=/usr/local/cargo/registry,type=volume",
+    "source=pnpm-store,target=/root/.local/share/pnpm,type=volume"
+  ]
+}
