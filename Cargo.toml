@@ -14,6 +14,8 @@ members = [
     "projects/11-redis-cache",
     "projects/12-multi-tenant-rls",
     "projects/13-load-test",
+    "projects/14-sagas",
+    "projects/15-capacity-planner",
     "apps/memberclub/api",
     "xtask",
 ]
