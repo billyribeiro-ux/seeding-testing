@@ -1,0 +1,34 @@
+[package]
+name        = "redis-cache"
+version     = { workspace = true }
+edition     = { workspace = true }
+rust-version = { workspace = true }
+license     = { workspace = true }
+description = "Phase 11 lab — cache primitives. A single-flight `get_or_compute` and a token-bucket rate limiter, both backed by a `CacheBackend` trait. An in-memory backend powers tests; a Redis backend is sketched in `docs/` for production wire-up."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+anyhow    = { workspace = true }
+thiserror = { workspace = true }
+tokio     = { workspace = true }
+tracing   = { workspace = true }
+chrono    = { workspace = true }
+async-trait = "0.1"
+
+[dev-dependencies]
+tokio = { workspace = true }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all      = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+must_use_candidate      = "allow"
+missing_errors_doc      = "allow"
+missing_panics_doc      = "allow"
+doc_markdown            = "allow"
+doc_lazy_continuation   = "allow"

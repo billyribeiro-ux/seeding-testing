@@ -1,0 +1,47 @@
+[package]
+name        = "memberclub-cli"
+version     = { workspace = true }
+edition     = { workspace = true }
+rust-version = { workspace = true }
+license     = { workspace = true }
+description = "Phase 9 deliverable — the `memberclub` Rust CLI. Talks to the MemberClub HTTP API via JWT bearer tokens. Demonstrates clap subcommands, config-file management, and end-to-end auth from a non-browser client."
+
+[[bin]]
+name = "memberclub"
+path = "src/main.rs"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+clap      = { workspace = true, features = ["env"] }
+anyhow    = { workspace = true }
+thiserror = { workspace = true }
+tokio     = { workspace = true }
+reqwest   = { workspace = true }
+serde     = { workspace = true }
+serde_json = { workspace = true }
+tracing   = { workspace = true }
+tracing-subscriber = { workspace = true }
+chrono    = { workspace = true }
+directories = "5"
+toml      = "0.8"
+
+[dev-dependencies]
+wiremock  = { workspace = true }
+tempfile  = { workspace = true }
+assert_cmd = { workspace = true }
+predicates = { workspace = true }
+tokio = { workspace = true }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all      = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+must_use_candidate      = "allow"
+missing_errors_doc      = "allow"
+missing_panics_doc      = "allow"
+doc_markdown            = "allow"

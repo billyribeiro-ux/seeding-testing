@@ -10,6 +10,10 @@ members = [
     "projects/06-stripe-money-lab",
     "projects/07-webhook-receiver",
     "projects/08-outbox-demo",
+    "projects/10-memberclub-cli",
+    "projects/11-redis-cache",
+    "projects/12-multi-tenant-rls",
+    "projects/13-load-test",
     "apps/memberclub/api",
 ]
 
