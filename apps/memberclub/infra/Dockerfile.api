@@ -1,0 +1,43 @@
+# MemberClub API — multi-stage Rust release image.
+#
+# Stage 1 builds against the workspace root so the build cache survives
+# small per-crate edits. Stage 2 is a distroless runtime that holds only
+# the binary + its migrations + the CA bundle. Final size ≈ 50 MiB.
+
+# ---------------------------------------------------------------------------
+# Stage 1 — builder
+# ---------------------------------------------------------------------------
+FROM rust:1.95-slim-bookworm AS builder
+
+# System libs the Rust crates we depend on need at build time.
+RUN apt-get update \
+ && apt-get install --no-install-recommends -y pkg-config libssl-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work
+
+# Copy the whole workspace. We do it in two passes so dep compilation is
+# cached: first the manifests, then the sources.
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+COPY projects/ ./projects/
+COPY apps/ ./apps/
+
+# Build only the binary we ship.
+RUN cargo build --release --bin memberclub-api
+
+# ---------------------------------------------------------------------------
+# Stage 2 — runtime
+# ---------------------------------------------------------------------------
+FROM gcr.io/distroless/cc-debian12:nonroot
+
+WORKDIR /app
+
+COPY --from=builder /work/target/release/memberclub-api ./
+COPY --from=builder /work/apps/memberclub/api/migrations ./migrations
+
+ENV RUST_LOG=info,memberclub_api=debug
+EXPOSE 3000
+
+# Run as the distroless `nonroot` user (uid 65532).
+USER 65532
+ENTRYPOINT ["/app/memberclub-api"]

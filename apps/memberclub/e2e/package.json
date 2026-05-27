@@ -1,0 +1,17 @@
+{
+  "name": "memberclub-e2e",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Playwright e2e suite for the MemberClub capstone (Phase 9).",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "PWDEBUG=1 playwright test",
+    "install-browsers": "playwright install --with-deps chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "typescript": "^5.6.0"
+  },
+  "packageManager": "pnpm@10.0.0"
+}

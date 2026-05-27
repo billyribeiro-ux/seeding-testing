@@ -1,0 +1,84 @@
+# MemberClub — single-box production reference stack.
+#
+# Bring up Caddy + API + Web + Postgres + Redis on one host. Suitable
+# for the early-stage SaaS deploy that doesn't need a real platform yet
+# (the curriculum's "ship to a Fly.io machine or a $5/mo VPS" target).
+#
+# Override secrets via a `.env` file in the same directory; never check
+# secret values in.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - web
+
+  api:
+    build:
+      context: ../../..
+      dockerfile: apps/memberclub/infra/Dockerfile.api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?must be set in .env}
+      JWT_SECRET:   ${JWT_SECRET:?must be set in .env}
+      SESSION_SECRET: ${SESSION_SECRET:?must be set in .env}
+      STRIPE_SECRET_KEY:    ${STRIPE_SECRET_KEY:?must be set in .env}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:?must be set in .env}
+      RUST_LOG: info,memberclub_api=info,tower_http=warn
+    expose:
+      - "3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  web:
+    build:
+      context: ../../..
+      dockerfile: apps/memberclub/infra/Dockerfile.web
+    restart: unless-stopped
+    environment:
+      ORIGIN: ${PUBLIC_ORIGIN:?must be set in .env}
+      API_BASE_URL: http://api:3000
+    expose:
+      - "3000"
+    depends_on:
+      - api
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-app}
+      POSTGRES_USER:     ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?must be set in .env}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test:     ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-app}"]
+      interval: 5s
+      timeout:  3s
+      retries:  10
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1"]
+    volumes:
+      - redis_data:/data
+
+volumes:
+  db_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
