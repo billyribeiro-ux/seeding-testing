@@ -52,11 +52,7 @@ fn mid_size_one_hundred_thousand_dau_baseline() {
     // 2 cores / 4 per instance → 1 instance × 2 replicas = 2.
     let p = plan(&base());
     assert!((p.avg_qps - 57.87).abs() < 0.5, "avg_qps={}", p.avg_qps);
-    assert!(
-        (p.peak_qps - 173.6).abs() < 1.0,
-        "peak_qps={}",
-        p.peak_qps
-    );
+    assert!((p.peak_qps - 173.6).abs() < 1.0, "peak_qps={}", p.peak_qps);
     assert!(
         (p.target_qps_with_headroom - 225.7).abs() < 1.0,
         "target_qps={}",

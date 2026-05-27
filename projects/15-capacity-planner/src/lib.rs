@@ -152,8 +152,7 @@ pub fn plan(inp: &Inputs) -> Plan {
     let replication = u64::from(inp.replication.max(1));
     let instances_needed = instances_per_copy.max(1) * replication;
 
-    let monthly_cost_usd =
-        instances_needed as f64 * inp.cost_per_instance_hr * HOURS_PER_MONTH;
+    let monthly_cost_usd = instances_needed as f64 * inp.cost_per_instance_hr * HOURS_PER_MONTH;
 
     // Cost per DAU per month, in cents. Useful for unit-economics
     // sanity checks ("does this fit inside our $5/user/mo plan?").
