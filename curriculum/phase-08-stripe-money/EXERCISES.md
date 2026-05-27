@@ -140,6 +140,14 @@ ordering deterministically.
 Property: for any two currencies A and B with A != B, `a.checked_add(b)` and
 `b.checked_add(a)` both return `Err(MoneyError::CurrencyMismatch { .. })`.
 
+Shipped as `currency_mismatch_is_symmetric` in the `prop_tests` module
+of `projects/06-stripe-money-lab/src/lib.rs`. It generates two random
+`(cents, currency)` pairs across all four currencies and asserts both
+`checked_add` and `checked_sub` return a `CurrencyMismatch` for one
+direction iff they do for the other — tightened with the equivalent
+`iff a_cur != b_cur` check so the property pins both directions of the
+biconditional.
+
 ---
 
 ## E8.8 — Reconciliation dry-run (Stretch) — shipped
@@ -149,3 +157,12 @@ Add a `dry_run` binary to `stripe-money-lab` that takes two CSV files
 `stripe_charge_id, amount_cents, currency`, and prints the diff: charges in
 one not the other, and the dollar discrepancy. Demonstrates the
 reconciliation logic without a live Stripe.
+
+The core primitives — `Money::checked_sub` (for the discrepancy) and
+`Currency`/`MoneyError::CurrencyMismatch` (to refuse comparing apples
+to JPY-shaped oranges) — already live in
+`projects/06-stripe-money-lab/src/lib.rs`. Add the binary as
+`projects/06-stripe-money-lab/src/bin/dry_run.rs` (or a `[[bin]]`
+entry in `Cargo.toml`) and drive it through the `csv` crate; the
+proportional-split tests are a template for verifying the diff sums
+back to the originating row totals.
