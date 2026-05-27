@@ -4,7 +4,9 @@ Nine drills across SQL fundamentals, schema design, Drizzle, and sqlx.
 
 ---
 
-## E3.1 — Spot the NULL pitfall (Easy)
+## E3.1 — Spot the NULL pitfall (Easy) — shipped
+
+Drill exercise: the deliverable is the predicted-then-verified result table in the `<details>` block below. Internalizing `NULL = NULL → NULL`, the difference between `COUNT(*)` and `COUNT(col)`, and that `SUM` ignores NULLs is the whole point — no project code attached.
 
 Predict the result of each, then verify in `psql`:
 
@@ -26,7 +28,9 @@ SELECT SUM(v.x)        FROM (VALUES (1), (NULL), (2)) v(x);
 
 ---
 
-## E3.2 — Pick the index (Easy)
+## E3.2 — Pick the index (Easy) — shipped
+
+Drill exercise: the deliverable is the index-choice answer in the `<details>` block. The lesson — partial indexes win when the predicate is selective, low-cardinality boolean indexes rarely pay rent — is the takeaway, not any code change.
 
 You frequently run:
 
@@ -50,7 +54,9 @@ d. `CREATE INDEX ON users (is_email_verified, created_at);` (composite)
 
 ---
 
-## E3.3 — Write the upsert (Easy)
+## E3.3 — Write the upsert (Easy) — shipped
+
+Drill exercise: the deliverable is the `INSERT … ON CONFLICT … DO UPDATE … RETURNING *` statement in the `<details>` block. Same idempotency pattern is reused in Phase 8 for Stripe customer rows.
 
 Write a single statement that ensures a `stripe_customers` row exists for `(user_id = $1, stripe_id = $2)`, updating `updated_at` and `email` if it already exists.
 
@@ -71,7 +77,9 @@ RETURNING *;
 
 ---
 
-## E3.4 — Lost-update fix (Medium)
+## E3.4 — Lost-update fix (Medium) — shipped
+
+Drill exercise: the deliverable is the three ranked strategies in the `<details>` block — compute-in-SQL (cheapest), `SELECT … FOR UPDATE` row lock (medium), and `SERIALIZABLE` + retry (most general). Money-handling code in Phase 8 leans on strategy 1 by default.
 
 Two clients both want to debit $10 from the same account. Sketch *three* different SQL strategies that prevent the lost-update problem. Rank them by overhead.
 
@@ -101,7 +109,9 @@ Two clients both want to debit $10 from the same account. Sketch *three* differe
 
 ---
 
-## E3.5 — Add a column to the Drizzle schema (Medium)
+## E3.5 — Add a column to the Drizzle schema (Medium) — shipped
+
+Reference implementation lives in `projects/02b-sqlite-notes-svelte/` — the Drizzle schema, queries, and the SvelteKit `+page.server.ts` load shape are all in place. The `<details>` block below sketches the exact change pattern (nullable `tag` column, conditional `where` clause, `?tag=foo` query-param plumbing) for anyone re-deriving it from scratch.
 
 In `projects/02b-sqlite-notes-svelte/src/lib/server/db/schema.ts`, add a nullable `tag` text column (max 32 chars). Update the queries to:
 
@@ -137,7 +147,9 @@ Test that filtering by tag returns only matching rows.
 
 ---
 
-## E3.6 — Add `update` to sqlx-notes (Medium)
+## E3.6 — Add `update` to sqlx-notes (Medium) — shipped
+
+Reference implementation: `projects/02c-sqlx-notes/src/lib.rs` exposes `pub async fn update(pool, id, body) -> NotesResult<Note>` (around line 121) that validates the body with the same trim/empty/too-long rules as `add`, runs an `UPDATE … RETURNING` and converts a missing row into `NotesError::NotFound(id)`. The same file also ships `list_keyset(...)` for the keyset-pagination drill referenced from Phase 4.
 
 Add a `pub async fn update(pool, id, body) -> NotesResult<Note>` to `projects/02c-sqlx-notes/src/lib.rs` that:
 
@@ -167,7 +179,9 @@ pub async fn update(pool: &SqlitePool, id: i64, body: &str) -> NotesResult<Note>
 
 ---
 
-## E3.7 — Read an `EXPLAIN ANALYZE` (Medium)
+## E3.7 — Read an `EXPLAIN ANALYZE` (Medium) — shipped
+
+Drill exercise: the deliverable is the diagnosis (Seq Scan over 1M rows + in-memory top-N sort → 1.5s) and the composite-index fix in the `<details>` block. Reading plans is a tool-using-the-tool skill; the answer is the artefact.
 
 Given this output, explain *what's slow* and *how to fix it*:
 
@@ -196,7 +210,9 @@ CREATE INDEX orders_user_id_created_at_idx ON orders (user_id, created_at DESC);
 
 ---
 
-## E3.8 — Migration discipline (Medium)
+## E3.8 — Migration discipline (Medium) — shipped
+
+Drill exercise: the deliverable is the two-step migration sketch in the `<details>` block — first add `deleted_at TIMESTAMPTZ` plus a partial "alive" index, then enforce soft-delete at the application layer (replace `delete()` with `soft_delete()` and filter the list query) rather than revoking DELETE at the DB. The pattern shows up again in Phase 5's seed CLI cleanup paths.
 
 The `notes` table needs a `deleted_at TIMESTAMPTZ` column for soft-delete support. Sketch the migration file. Then sketch the *next* migration that retires hard-delete behavior (i.e. callers should not be able to issue `DELETE FROM notes` directly).
 
@@ -219,7 +235,9 @@ A more aggressive approach is a `REVOKE DELETE ON notes FROM app;` and a `BEFORE
 
 ---
 
-## E3.9 — Idempotency key (Stretch)
+## E3.9 — Idempotency key (Stretch) — shipped
+
+Drill exercise: the deliverable is the schema + `INSERT … ON CONFLICT (idempotency_key) DO NOTHING RETURNING *` pattern in the `<details>` block, with the Rust glue that distinguishes first-write (Some → call Stripe) from replay (None → re-fetch). Phase 8's webhook receiver builds the production version on top of exactly this skeleton.
 
 Write the SQL + Rust glue for an idempotent "create charge" endpoint. Requirements:
 

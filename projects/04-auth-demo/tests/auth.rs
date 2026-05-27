@@ -319,3 +319,69 @@ async fn logout_invalidates_cookie() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 }
+
+/// E7.5 — first-user-becomes-admin. The first account to register on a
+/// fresh DB is auto-promoted to `is_admin = true`; the second is a
+/// normal member. This is the "bootstrap the owner" pattern: it avoids
+/// shipping a hard-coded admin password while still leaving the system
+/// usable on first boot.
+#[tokio::test]
+async fn first_registered_user_is_admin() {
+    let app = app().await;
+
+    // First user → admin.
+    let res = app
+        .clone()
+        .oneshot(json_req(
+            "POST",
+            "/auth/register",
+            &json!({"email":"founder@example.com","password":"correct horse battery staple"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let body = read_json(res.into_body()).await;
+    assert_eq!(body["is_admin"], true, "first user should be admin");
+
+    // Second user → normal member.
+    let res = app
+        .clone()
+        .oneshot(json_req(
+            "POST",
+            "/auth/register",
+            &json!({"email":"member@example.com","password":"correct horse battery staple"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let body = read_json(res.into_body()).await;
+    assert_eq!(body["is_admin"], false, "second user should NOT be admin");
+
+    // Confirm via /me using bearer for the first user — defends against
+    // the response-body lying while the DB row is wrong.
+    let res = app
+        .clone()
+        .oneshot(json_req(
+            "POST",
+            "/auth/login",
+            &json!({"email":"founder@example.com","password":"correct horse battery staple"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let login = read_json(res.into_body()).await;
+    let token = login["access_token"].as_str().unwrap().to_string();
+
+    let res = app
+        .oneshot(
+            Request::get("/me")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let me = read_json(res.into_body()).await;
+    assert_eq!(me["is_admin"], true);
+}

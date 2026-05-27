@@ -4,7 +4,9 @@ Eight graded drills. Each one builds on the lessons; some on `hello-cli` itself.
 
 ---
 
-## E1.1 — Predict the type (Easy)
+## E1.1 — Predict the type (Easy) — shipped
+
+Type-inference drill. The eight worked answers (default integer/float, `&'static str`, tuple/array shapes) are in the `<details>` block below — the deliverable is the learner predicting and then comparing.
 
 For each expression, write what type Rust infers. (Hint: open `cargo expand` if you want to peek.)
 
@@ -33,7 +35,9 @@ let h: [i32; 3] = [1, 2, 3];
 
 ---
 
-## E1.2 — Ownership trace (Easy)
+## E1.2 — Ownership trace (Easy) — shipped
+
+Move-semantics drill. Both fixes (clone vs reference) are written out in the `<details>` answer below, with the rationale for preferring the borrow.
 
 Will this compile? If not, fix it.
 
@@ -52,7 +56,9 @@ Won't compile — ownership moved from `s` to `t`. Fix either by cloning (`let t
 
 ---
 
-## E1.3 — Borrow checker fight (Easy)
+## E1.3 — Borrow checker fight (Easy) — shipped
+
+Borrow-checker drill. Two no-clone fixes (using `Copy` for `i32`, and re-ordering the last use of the borrow) are spelled out in the `<details>` answer below.
 
 Make this compile *without* `.clone()`:
 
@@ -84,7 +90,9 @@ v.push(4);
 
 ---
 
-## E1.4 — Replace `.unwrap()` (Medium)
+## E1.4 — Replace `.unwrap()` (Medium) — shipped
+
+Result-plumbing drill. The fixed function (with `?` and `unwrap_or("")`) and the note on why the first `unwrap()` is actually safe are in the `<details>` answer below.
 
 Rewrite this so it returns `Result<i32, ParseIntError>` instead of panicking:
 
@@ -112,7 +120,9 @@ Note: `.split(',').next()` always returns `Some(_)` for a `&str`, even if the in
 
 ---
 
-## E1.5 — A typed error enum (Medium)
+## E1.5 — A typed error enum (Medium) — shipped
+
+`thiserror` drill. The full reference solution — the three-variant enum, the `validate` implementation, and four matching unit tests — is in the `<details>` answer below.
 
 Write a `thiserror`-style error type for a tiny "username validator" with three failure modes:
 
@@ -171,7 +181,9 @@ mod tests {
 
 ---
 
-## E1.6 — Add a `--bytes` flag to `hello-cli` (Medium)
+## E1.6 — Add a `--bytes` flag to `hello-cli` (Medium) — shipped
+
+Hands-on extension of the shipped `projects/01-hello-cli/` crate (`src/lib.rs`, `src/main.rs`, `tests/cli.rs`). The starting `Counts` / `Selection` / `Cli` types are already in place; the `<details>` answer below sketches the patch (new `bytes` field, the clap flag, and matching unit + integration tests) for the learner to apply on top.
 
 Modify `projects/01-hello-cli`:
 
@@ -232,7 +244,9 @@ fn bytes_flag_prints_byte_count() {
 
 ---
 
-## E1.7 — Newtype IDs (Medium)
+## E1.7 — Newtype IDs (Medium) — shipped
+
+Newtype-pattern drill. The full refactored solution (`UserId`, `Cents`, and the now-type-safe `transfer` signature) is in the `<details>` answer below, along with the senior-habit rationale.
 
 Refactor the following function so it's impossible to call with arguments in the wrong order:
 
@@ -273,7 +287,9 @@ Newtype IDs are a *senior* habit. They cost almost nothing and eliminate an enti
 
 ---
 
-## E1.8 — Add a property test (Stretch)
+## E1.8 — Add a property test (Stretch) — shipped
+
+Property-test drill — and the deliverable is already in tree: `projects/01-hello-cli/src/lib.rs` has a `mod prop` block (using `proptest`) that asserts `Counts::count(s).chars == s.chars().count()` plus a bonus invariant on `words`. The `<details>` answer below restates the minimal version.
 
 Add the `proptest` crate to `hello-cli` (as a dev-dependency) and prove this invariant:
 

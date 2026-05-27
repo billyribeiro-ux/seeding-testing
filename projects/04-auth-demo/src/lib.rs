@@ -367,7 +367,7 @@ async fn register(
 
     let hash = password::hash(&body.password).map_err(|e| ApiError::Password(e.to_string()))?;
 
-    let user: User = sqlx::query_as::<_, User>(
+    let mut user: User = sqlx::query_as::<_, User>(
         "INSERT INTO users (email, password_hash) VALUES (?, ?)
          RETURNING id, email, password_hash, is_email_verified, is_admin, created_at, updated_at,
                    totp_secret, totp_enabled, totp_last_verified_at",
@@ -380,6 +380,22 @@ async fn register(
         sqlx::Error::Database(db) if db.is_unique_violation() => ApiError::EmailAlreadyRegistered,
         _ => ApiError::Db(e),
     })?;
+
+    // E7.5 — first-user-becomes-admin. If the row we just inserted is the
+    // *only* row in the table, this is the bootstrap user; grant admin in
+    // an idempotent UPDATE and emit a dedicated audit-log line. Subsequent
+    // registrations see a count >= 2 and skip the promotion.
+    let user_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users")
+        .fetch_one(&s.pool)
+        .await?;
+    if user_count == 1 {
+        sqlx::query("UPDATE users SET is_admin = 1 WHERE id = ?")
+            .bind(user.id)
+            .execute(&s.pool)
+            .await?;
+        user.is_admin = 1;
+        audit(&s.pool, Some(user.id), "user.first_admin_bootstrap", None).await?;
+    }
 
     audit(&s.pool, Some(user.id), "user.registered", None).await?;
     Ok((StatusCode::CREATED, Json(UserDto::from(user))))

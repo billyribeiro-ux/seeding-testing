@@ -4,7 +4,9 @@ Seven graded drills extending `projects/04-auth-demo`.
 
 ---
 
-## E6.1 — Hash a password (Easy)
+## E6.1 — Hash a password (Easy) — shipped
+
+Drill exercise: the deliverable is the ~12-line scratch program in the `<details>` block — read two passwords from stdin, hash the first with argon2id + `SaltString::generate(&mut OsRng)`, print the PHC string, then verify the second against it. The library used here (`argon2`) is the same one wired into `projects/04-auth-demo/src/password.rs` for real signup/login.
 
 Outside the project, in a small scratch binary, take a plaintext password from
 stdin, hash it with argon2id, print the PHC string. Then verify a second input
@@ -34,7 +36,9 @@ fn main() {
 
 ---
 
-## E6.2 — Email verification (Medium)
+## E6.2 — Email verification (Medium) — shipped
+
+Reference implementation: `projects/04-auth-demo/src/email_verify.rs` ships the `email_verifications` table migration, `POST /auth/verify-email/request` (issues a random token, stores only the hash, returns 204), and `POST /auth/verify-email/confirm` (atomic transaction: claim token, mark `used_at`, set `users.is_email_verified = 1`). Integration tests in `projects/04-auth-demo/tests/email_verify.rs` cover the happy path, replay rejection, and expired-token rejection.
 
 Add an `email_verifications` table, a `POST /auth/verify-email/request` endpoint
 that issues a token (stored hashed), and `POST /auth/verify-email/confirm` that
@@ -109,7 +113,9 @@ tx.commit().await?;
 
 ---
 
-## E6.4 — Add TOTP 2FA (Medium)
+## E6.4 — Add TOTP 2FA (Medium) — shipped
+
+Reference implementation: `projects/04-auth-demo/src/totp.rs` wires the `totp-rs` crate and exposes `POST /auth/totp/enroll` (returns the otpauth provisioning URI plus 10 single-use recovery codes, hashed at rest), `POST /auth/totp/verify` (confirms enrollment by validating a code against the pending secret), and the login flow's second-step branch. Integration tests in `projects/04-auth-demo/tests/totp.rs` cover enrollment, verification, recovery-code single-use, and the login-with-2FA path.
 
 Add `totp-rs` dep. Endpoints: `POST /auth/totp/enroll` (returns provisioning URI
 and 10 recovery codes), `POST /auth/totp/verify` (confirms enrollment), and

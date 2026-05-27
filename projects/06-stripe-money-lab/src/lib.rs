@@ -56,6 +56,8 @@ pub enum MoneyError {
     Overflow(i64),
     #[error("currency mismatch: {a:?} vs {b:?}")]
     CurrencyMismatch { a: Currency, b: Currency },
+    #[error("division by zero")]
+    DivByZero,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -133,6 +135,27 @@ impl Money {
             .checked_mul(by)
             .ok_or(MoneyError::Overflow(i64::MAX))?;
         Money::new(product, self.currency)
+    }
+
+    /// Integer division by an `i64` divisor.
+    ///
+    /// Rounding is **truncation toward zero** (the default `i64` `/`
+    /// behavior): e.g. `Money(7, USD).checked_div(2)` returns `3` cents,
+    /// and `Money(-7, USD).checked_div(2)` returns `-3` cents. A zero
+    /// divisor returns [`MoneyError::DivByZero`]; a negative divisor
+    /// flips the sign as expected.
+    pub fn checked_div(self, divisor: i64) -> Result<Money, MoneyError> {
+        if divisor == 0 {
+            return Err(MoneyError::DivByZero);
+        }
+        // `checked_div` only fails on divisor == 0 (handled) or
+        // `i64::MIN / -1` overflow; either way `Money::new` re-validates
+        // against the ceiling.
+        let quotient = self
+            .cents
+            .checked_div(divisor)
+            .ok_or(MoneyError::Overflow(i64::MAX))?;
+        Money::new(quotient, self.currency)
     }
 }
 
@@ -277,6 +300,31 @@ mod tests {
     fn mul_overflow_to_ceiling() {
         let a = usd(MONEY_CEILING_CENTS / 2 + 1);
         assert!(a.checked_mul(2).is_err());
+    }
+
+    #[test]
+    fn div_truncates_toward_zero() {
+        // 7 / 2 -> 3 cents (positive truncation)
+        assert_eq!(usd(7).checked_div(2).unwrap().cents, 3);
+        // -7 / 2 -> -3 cents (negative truncation toward zero, not floor)
+        assert_eq!(usd(-7).checked_div(2).unwrap().cents, -3);
+        // 1000 / 4 -> 250 cents (exact)
+        assert_eq!(usd(1000).checked_div(4).unwrap().cents, 250);
+    }
+
+    #[test]
+    fn div_by_zero_errors() {
+        assert_eq!(usd(100).checked_div(0).unwrap_err(), MoneyError::DivByZero);
+        // Even on a zero dividend, dividing by zero is an error.
+        assert_eq!(usd(0).checked_div(0).unwrap_err(), MoneyError::DivByZero);
+    }
+
+    #[test]
+    fn div_by_negative_flips_sign() {
+        // 1000 / -2 -> -500
+        assert_eq!(usd(1000).checked_div(-2).unwrap().cents, -500);
+        // -1000 / -2 -> 500 (two negatives cancel)
+        assert_eq!(usd(-1000).checked_div(-2).unwrap().cents, 500);
     }
 
     #[test]
@@ -451,6 +499,38 @@ mod prop_tests {
             let m = Money::new(cents, Currency::USD).unwrap();
             prop_assert_eq!(m.checked_mul(1).unwrap(), m);
             prop_assert!(m.checked_mul(0).unwrap().is_zero());
+        }
+
+        /// Currency mismatch on `checked_add` is symmetric: if
+        /// `a.checked_add(b)` errors with `CurrencyMismatch`, then so
+        /// does `b.checked_add(a)`. Same property for `checked_sub`.
+        #[test]
+        fn currency_mismatch_is_symmetric(
+            a_cents in small_cents(),
+            b_cents in small_cents(),
+            a_cur in any_currency(),
+            b_cur in any_currency(),
+        ) {
+            fn is_mismatch(r: Result<Money, MoneyError>) -> bool {
+                matches!(r, Err(MoneyError::CurrencyMismatch { .. }))
+            }
+
+            let a = Money::new(a_cents, a_cur).unwrap();
+            let b = Money::new(b_cents, b_cur).unwrap();
+
+            // checked_add symmetry.
+            let ab_add = a.checked_add(b);
+            let ba_add = b.checked_add(a);
+            prop_assert_eq!(is_mismatch(ab_add), is_mismatch(ba_add));
+            // And the equivalence is tight: a mismatch happens iff the
+            // currencies differ.
+            prop_assert_eq!(is_mismatch(ab_add), a_cur != b_cur);
+
+            // checked_sub symmetry.
+            let ab_sub = a.checked_sub(b);
+            let ba_sub = b.checked_sub(a);
+            prop_assert_eq!(is_mismatch(ab_sub), is_mismatch(ba_sub));
+            prop_assert_eq!(is_mismatch(ab_sub), a_cur != b_cur);
         }
     }
 }

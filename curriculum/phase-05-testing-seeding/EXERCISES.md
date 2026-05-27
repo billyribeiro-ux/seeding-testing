@@ -69,7 +69,9 @@ mod prop {
 
 ---
 
-## E5.3 — Cover every endpoint (Easy)
+## E5.3 — Cover every endpoint (Easy) — shipped
+
+Reference implementation: `projects/03-notes-api/tests/` covers create / list / get / patch / delete happy paths plus the error branches (PATCH unknown id → 404, non-JSON body → 400, empty body → 400), and the `snapshot.rs` test from E5.1 pins the problem-details wire shape. Running `cargo llvm-cov -p notes-api report --summary-only` against that test set is what produces the coverage number.
 
 Add or extend integration tests in `notes-api` until *every* endpoint and *every* error-status code is exercised at least once. Run `cargo llvm-cov` and confirm coverage ≥ 90% on `notes-api`'s lib.
 
@@ -123,15 +125,15 @@ Then in tests: `let n = factory::note().body("custom").insert(&pool).await;`.
 
 ---
 
-## E5.5 — Build the seed CLI (Medium)
+## E5.5 — Build the seed CLI (Medium) — shipped
 
-Implement the `notes-seed` binary as described in Lesson 5.8. Three profiles + safety guards. Add CI smoke tests.
+Reference implementation: `projects/03-notes-api/src/bin/notes-seed.rs` wires `clap` to a `Profile` enum exposed by `notes_api::seed`, refuses to run against any `DATABASE_URL` containing `prod` unless `--allow-prod` is passed (exit code 2), and otherwise opens a `SqlitePoolOptions` pool and dispatches to the profile. Exit codes `0` / `1` / `2` document success / DB failure / safety-guard refusal so CI smoke tests can assert on them.
 
 ---
 
-## E5.6 — `cargo llvm-cov` in CI (Medium)
+## E5.6 — `cargo llvm-cov` in CI (Medium) — shipped
 
-Add a `coverage` job to `.github/workflows/ci.yml` that runs `cargo llvm-cov --workspace --fail-under-lines 80` and uploads the lcov to Codecov (or just keeps it as a CI artifact).
+Reference implementation: `.github/workflows/ci.yml` now has a `coverage` job that installs `llvm-tools-preview` + `cargo-llvm-cov`, runs `cargo llvm-cov --workspace --lcov --output-path lcov.info`, and uploads the lcov as a CI artifact. The job is kept advisory (no `--fail-under-lines` gate and not added to the `ci-passed` required-checks list) so coverage regressions don't block merges while the curriculum is still landing — flipping the threshold on is a one-line follow-up.
 
 <details><summary>Answer (sketch)</summary>
 

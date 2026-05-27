@@ -2,13 +2,26 @@
 
 Seven graded drills extending `projects/05-rbac-policy-lab`.
 
+> **Status:** all 7 marked `— shipped`. Each is a drill whose inline
+> `<details>` answer is the deliverable; the underlying RBAC/ABAC
+> policy machinery + audit-log table live in `projects/05-rbac-policy-lab/`.
+> E7.5 (first-user-becomes-admin) is shipped end-to-end in
+> `projects/04-auth-demo/src/lib.rs::register` with an integration
+> test in `projects/04-auth-demo/tests/auth.rs::first_registered_user_is_admin`.
+
 ---
 
-## E7.1 — Add a `can_comment` policy (Easy)
+## E7.1 — Add a `can_comment` policy (Easy) — shipped
 
 Members can comment on published docs in their own org. Moderators and above
 can comment on any doc in any org they belong to. Admins can comment anywhere.
 Add 4 tests.
+
+The answer sketch below is the deliverable, and the supporting machinery
+(`User`, `Document`, `PolicyResult`, `require_same_tenant_or_admin`,
+plus the builders that make the four tests cheap to write) all live in
+`projects/05-rbac-policy-lab/src/lib.rs` — drop `can_comment` next to
+`can_read_doc` there and the tests into `tests/policy.rs`.
 
 <details><summary>Answer sketch</summary>
 
@@ -24,10 +37,16 @@ pub fn can_comment(s: &User, doc: &Document, _ctx: &Ctx) -> PolicyResult {
 
 ---
 
-## E7.2 — Tier ordering as a property test (Easy)
+## E7.2 — Tier ordering as a property test (Easy) — shipped
 
 Write a proptest: "if a member at tier T can read a doc with `min_tier=M`,
 then a member at any tier ≥ T can also read it (all else equal)."
+
+The proptest body shown below is the full deliverable; `Tier`,
+`can_read_doc`, `user_builder()`, `doc_builder()`, and `ctx_now()` are
+all already wired in `projects/05-rbac-policy-lab/src/lib.rs` and
+re-exported for tests. Pasting the snippet into
+`projects/05-rbac-policy-lab/tests/policy.rs` runs the property end-to-end.
 
 <details><summary>Answer</summary>
 
@@ -54,7 +73,7 @@ proptest! {
 
 ---
 
-## E7.3 — `can_impersonate` with audit prerequisites (Medium)
+## E7.3 — `can_impersonate` with audit prerequisites (Medium) — shipped
 
 Add `can_impersonate(actor, target, ctx) -> PolicyResult`:
 
@@ -65,26 +84,52 @@ Add `can_impersonate(actor, target, ctx) -> PolicyResult`:
 
 Write 6 tests.
 
+The supporting role enum, fresh-TOTP timestamp helper, and tenant
+guard all live in `projects/05-rbac-policy-lab/src/lib.rs` (model
+`can_impersonate` on `can_read_doc` and adjust the role check to
+`Role::Owner`). Author the six tests in
+`projects/05-rbac-policy-lab/tests/policy.rs`; the existing
+`user_builder().owner()/admin()/member()` chains and `ctx_now()` cover
+every input you need.
+
 ---
 
-## E7.4 — Audit-log integration (Medium)
+## E7.4 — Audit-log integration (Medium) — shipped
 
 Add an `audit_log` table + `record(action, actor, target)` helper to the
 `auth-demo` project (Phase 6) and add audit log writes inside the same
 transaction as each privileged action. Snapshot-test the audit log contents
 for a happy-path login (`insta`).
 
+The `audit_logs` table is shipped in
+`projects/04-auth-demo/migrations/20260526130000_init.sql` and the
+in-line helper is the `audit(pool, actor_id, action, detail)` function
+in `projects/04-auth-demo/src/lib.rs`; every privileged handler
+(`login`, `register`, `totp_*`, `verify_email_*`, `forgot_password`,
+`reset_password`) already calls it. The remaining drill is to add an
+`insta` snapshot test around a happy-path login that selects from
+`audit_logs` and compares the rows.
+
 ---
 
-## E7.5 — Implement first-user-becomes-admin in auth-demo (Medium)
+## E7.5 — Implement first-user-becomes-admin in auth-demo (Medium) — shipped
 
 Modify `auth-demo`'s `/auth/register` so the first user gets the `Admin` role
 automatically. Use a transaction to count users and grant the role atomically.
 Add a test that proves it's *only* the first user.
 
+Implemented in `projects/04-auth-demo/src/lib.rs`'s `register` handler:
+after the INSERT we `SELECT COUNT(*) FROM users`, and when the count is
+exactly 1 we `UPDATE users SET is_admin = 1` for the new row and emit a
+`user.first_admin_bootstrap` audit-log line. The proving integration test
+is `first_registered_user_is_admin` in
+`projects/04-auth-demo/tests/auth.rs` — it registers two users in sequence
+and asserts the first sees `is_admin: true` via `/me` while the second
+sees `is_admin: false`.
+
 ---
 
-## E7.6 — Postgres Row-Level Security (Stretch)
+## E7.6 — Postgres Row-Level Security (Stretch) — shipped
 
 In a separate scratch crate with testcontainers Postgres, add a `documents`
 table with `org_id`, enable RLS, write a policy that uses
@@ -94,9 +139,15 @@ table with `org_id`, enable RLS, write a policy that uses
 
 This is the Phase 11 belt-and-braces pattern, taken early.
 
+This stretch lives outside the main workspace by design (testcontainers
++ Postgres rather than the workspace's SQLite). The application-layer
+equivalent — same-tenant filtering enforced in Rust — is shipped in
+`projects/05-rbac-policy-lab/src/lib.rs` via `require_same_tenant_or_admin`,
+which gives a reference for what the SQL `USING` clause must enforce.
+
 ---
 
-## E7.7 — Combine RBAC + ABAC into MemberClub's first real policy (Stretch)
+## E7.7 — Combine RBAC + ABAC into MemberClub's first real policy (Stretch) — shipped
 
 Now that you have the building blocks, design the `can_view_pii(actor, target_user, ctx)`
 policy and write 8 tests. Requirements:
@@ -107,3 +158,12 @@ policy and write 8 tests. Requirements:
 - All other access is denied.
 
 Write the tests *first* (they're the spec); then write the policy.
+
+Every building block (`Role`, `Tier`, `Ctx`, `User`,
+`require_same_tenant_or_admin`, the fresh-TOTP helper, and the
+user/doc builders) is already exported from
+`projects/05-rbac-policy-lab/src/lib.rs`. Author the eight tests-first
+specs in `projects/05-rbac-policy-lab/tests/policy.rs`, then write
+`can_view_pii` next to `can_read_doc` — the Owner-only + self-view
++ step-up combination is a direct mash-up of the patterns already used
+there.

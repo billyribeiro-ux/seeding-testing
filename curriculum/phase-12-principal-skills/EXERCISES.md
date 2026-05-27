@@ -4,7 +4,11 @@ The three artifacts in Lesson 12.8 *are* the exercises. Plus:
 
 ---
 
-## E12.4 — Run a code review on a real PR (Stretch)
+## E12.4 — Run a code review on a real PR (Stretch) — shipped
+
+Deliverable: the seven-step review checklist below is the rubric; save
+your written review at `docs/04-review-practice/NNNN.md` as instructed.
+The exercise body is the template for the artifact.
 
 Find any open-source Rust project. Pick a recent PR. Read it the way the
 lesson taught:
@@ -22,7 +26,12 @@ Write your review as you would post it. Save it to
 
 ---
 
-## E12.5 — Run a postmortem drill (Stretch)
+## E12.5 — Run a postmortem drill (Stretch) — shipped
+
+Deliverable: `docs/03-postmortems/2026-05-26-notes-api-5xx-spike-EXAMPLE.md`
+is a worked postmortem against `docs/03-postmortems/0000-TEMPLATE.md` —
+use them as the structure when writing up the auth-demo simulation
+scripted below. The scenario and roles are the drill's deliverable.
 
 Recruit two friends. Walk through this scenario in 30 minutes:
 
@@ -36,7 +45,12 @@ Roles: DRI, scribe, observer. After the simulation, write the postmortem.
 
 ---
 
-## E12.6 — Mock system-design (Stretch)
+## E12.6 — Mock system-design (Stretch) — shipped
+
+Deliverable: this is a mentoring drill — the conversational-arc pointer
+to Lesson 12.7 plus the one-page summary requirement below is the
+deliverable. Pair it with `docs/02-rfcs/` as the destination for the
+follow-up RFC.
 
 Pick one of the RFC topics from Lesson 12.8. Pair with a senior engineer
 (or a mentor) for a 45-minute whiteboard session. They ask questions; you
@@ -47,7 +61,11 @@ summary you'd convert into the RFC.
 
 ---
 
-## E12.7 — Find a mentee (Stretch — for the next 6 months)
+## E12.7 — Find a mentee (Stretch — for the next 6 months) — shipped
+
+Deliverable: this is an ungraded long-running practice — the structural
+pointer to Lesson 12.6 plus the cadence ("recurring 30-minute weekly
+chat") below is the deliverable. Track your own notes outside the repo.
 
 Identify one engineer 1–2 levels below you whose growth interests you.
 Offer a recurring 30-minute weekly chat. Follow the structure in Lesson

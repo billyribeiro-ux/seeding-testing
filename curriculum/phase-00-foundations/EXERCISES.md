@@ -4,7 +4,9 @@ Five graded exercises. Hidden answers behind `<details>` tags — try first, pee
 
 ---
 
-## E0.1 — Identify the box (Easy)
+## E0.1 — Identify the box (Easy) — shipped
+
+Pure mental-model drill. The deliverable is the learner classifying each error message; the worked answer (with the rationale for each box) is in the `<details>` block immediately below.
 
 For each error message, name which box it belongs to (Editor / Language / Runtime / OS):
 
@@ -25,7 +27,9 @@ For each error message, name which box it belongs to (Editor / Language / Runtim
 
 ---
 
-## E0.2 — Path practice (Easy)
+## E0.2 — Path practice (Easy) — shipped
+
+Shell drill — the seven-step ritual lives in the `<details>` answer below as a copy-pasteable bash script. The deliverable is the learner running each command in their own terminal.
 
 Without using your file manager, in the terminal:
 
@@ -52,7 +56,9 @@ rmdir scratch                # 7
 
 ---
 
-## E0.3 — Conventional Commit (Easy)
+## E0.3 — Conventional Commit (Easy) — shipped
+
+Rewrite drill. Five worked conversions (type/scope/subject) are in the `<details>` answer below; learners compare their rewrites against the model answers.
 
 Rewrite these informal commit messages in Conventional Commits form:
 
@@ -73,7 +79,9 @@ Rewrite these informal commit messages in Conventional Commits form:
 
 ---
 
-## E0.4 — Recover a lost commit (Medium)
+## E0.4 — Recover a lost commit (Medium) — shipped
+
+Hands-on git drill. Reproducer script is in the prompt, and the recovery recipe (`git reflog` + `git cherry-pick`) plus cleanup steps are in the `<details>` answer below — the deliverable is the learner running it on a throwaway `playground` branch.
 
 Simulate the disaster everyone hits eventually:
 
@@ -110,7 +118,9 @@ Lesson: **`git reflog` is your time machine even after `reset --hard`.**
 
 ---
 
-## E0.5 — Watch your own CI failure (Stretch)
+## E0.5 — Watch your own CI failure (Stretch) — shipped
+
+Experiential drill against this repo's CI. No code lands; the deliverable is the learner pushing a deliberate break, watching `gh run watch` go red, and fixing it. The `<details>` block below explains what the learner should *feel* during the loop.
 
 Deliberately break something to *experience* a failing CI run:
 

@@ -4,7 +4,9 @@ Seven graded drills. Some standalone; some extending `projects/02-quote-generato
 
 ---
 
-## E2.1 — Sequential vs concurrent (Easy)
+## E2.1 — Sequential vs concurrent (Easy) — shipped
+
+`tokio::join!` drill. Both the sequential prediction (~3 s) and the concurrent rewrite (~1 s) are written out in the `<details>` answer below; the deliverable is the learner running each and timing them.
 
 Predict the runtime, then run it and check. Each `sleep` is 1 second.
 
@@ -38,7 +40,9 @@ About 1 s. The three sleeps share the runtime.
 
 ---
 
-## E2.2 — `try_join!` (Easy)
+## E2.2 — `try_join!` (Easy) — shipped
+
+`tokio::try_join!` drill. The one-line solution that fetches both concurrently and short-circuits on either error is in the `<details>` answer below.
 
 Given two async functions `fetch_a()` and `fetch_b()` that return `Result<String, anyhow::Error>`, write a function `both()` that fetches them concurrently and returns the pair. Short-circuit on either error.
 
@@ -53,7 +57,9 @@ async fn both() -> anyhow::Result<(String, String)> {
 
 ---
 
-## E2.3 — Spawn vs await (Easy)
+## E2.3 — Spawn vs await (Easy) — shipped
+
+Spawn-vs-await drill. The diagnosis (serialized `.await`s) and both fixes (gather handles first, or `tokio::join!` them) are in the `<details>` answer below.
 
 Why does the following take ~3 seconds instead of ~1?
 
@@ -81,7 +87,9 @@ Or use `tokio::join!(h1, h2, h3)`.
 
 ---
 
-## E2.4 — Add an overall deadline test (Medium)
+## E2.4 — Add an overall deadline test (Medium) — shipped
+
+Targets the shipped `projects/02-quote-generator/` binary: `src/main.rs` already returns exit code `3` and prints "overall deadline ... exceeded" when `--deadline` trips (see `cfg.overall_deadline` plumbing in `src/lib.rs`). The `<details>` answer below provides the wiremock-backed `tests/cli.rs` integration test the learner appends.
 
 Add an integration test to `projects/02-quote-generator/tests/cli.rs` that:
 
@@ -116,7 +124,9 @@ async fn overall_deadline_exits_with_code_3() {
 
 ---
 
-## E2.5 — Channels: producer/consumer (Medium)
+## E2.5 — Channels: producer/consumer (Medium) — shipped
+
+`mpsc` drill. The complete producer/consumer program (bounded `mpsc::channel`, two spawned tasks, `tokio::join!` to wait) is in the `<details>` answer below — the deliverable is the learner pasting it into a scratch binary and running it.
 
 Write a small program where a producer task pushes 10 integers into an `mpsc::channel`, a consumer task prints them, and `main` waits for both to finish.
 
@@ -140,7 +150,9 @@ async fn main() {
 
 ---
 
-## E2.6 — Cancellation safety audit (Medium)
+## E2.6 — Cancellation safety audit (Medium) — shipped
+
+Reading exercise against the shipped `projects/02-quote-generator/src/lib.rs::fetch_one`. The two `.await` points (the `timeout(...)` around `reqwest::send`, and the `timeout(...)` around `resp.bytes()`) are already present in the code; the `<details>` answer below walks through each and links the takeaway to idempotency in Phase 8.
 
 In `projects/02-quote-generator/src/lib.rs::fetch_one`, identify every `.await` point. For each, write one sentence explaining what happens to the in-flight work if the task is cancelled there.
 
@@ -155,7 +167,9 @@ Lesson: cancellation-safe at the *client* level. Server-side idempotency is a se
 
 ---
 
-## E2.7 — Bounded concurrency (Stretch)
+## E2.7 — Bounded concurrency (Stretch) — shipped
+
+Stretch extension of `projects/02-quote-generator/` — the base semaphore + `fetch_one` are already in `src/lib.rs`, and the `<details>` sketch below shows where to wrap the existing logic in a retry loop (holding the permit across attempts) plus how to drive the test deterministically with `wiremock`'s `up_to_n_times` and `tokio::time::pause()`. No retry code is shipped in the crate; the deliverable is the learner adding it on top.
 
 Add a `--retries N` flag to `quote-generator`: each failed fetch is retried up to `N` times with exponential backoff (100 ms, 200 ms, 400 ms). The semaphore must still cap *total* concurrent in-flight requests (retries count).
 
