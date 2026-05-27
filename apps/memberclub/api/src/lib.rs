@@ -13,6 +13,7 @@
 //! whole service can be read top-to-bottom.
 
 pub mod auth;
+pub mod billing;
 pub mod notes;
 pub mod policy;
 
@@ -54,6 +55,9 @@ pub struct AppState {
     pub cookie_key: Key,
     pub jwt: Arc<Jwt>,
     pub metrics: Arc<PrometheusHandle>,
+    /// Stripe webhook signing secret. `None` disables `/webhooks/stripe`
+    /// — useful in test environments where Stripe isn't configured.
+    pub stripe_webhook_secret: Option<Arc<str>>,
 }
 
 /// Cache the first installed Prometheus handle so subsequent `AppState::new`
@@ -86,7 +90,16 @@ impl AppState {
             cookie_key,
             jwt: Arc::new(jwt),
             metrics,
+            stripe_webhook_secret: None,
         }
+    }
+
+    /// Builder: attach the Stripe webhook secret. Without this the
+    /// `/webhooks/stripe` handler responds 401 to every request.
+    #[must_use]
+    pub fn with_stripe_webhook_secret(mut self, secret: impl Into<Arc<str>>) -> Self {
+        self.stripe_webhook_secret = Some(secret.into());
+        self
     }
 }
 
@@ -112,6 +125,11 @@ pub fn router(state: AppState) -> Router {
         .route("/healthz", get(health))
         .route("/metrics", get(metrics_handler))
         .nest("/v1", v1)
+        // Phase 8 — billing routes (Checkout, Portal, /webhooks/stripe).
+        // The webhook is intentionally NOT under /v1: Stripe doesn't
+        // know our version namespace, and a future v1-only rate-limit
+        // shouldn't throttle Stripe deliveries.
+        .merge(billing::router())
         .with_state(state)
         .layer(middleware::from_fn(record_metrics))
         .layer(CompressionLayer::new())
@@ -367,6 +385,8 @@ pub enum ApiError {
     TooLong,
     #[error("invalid tier — must be one of free|pro|elite")]
     InvalidTier,
+    #[error("bad request: {0}")]
+    BadRequest(String),
     #[error(transparent)]
     Db(#[from] sqlx::Error),
     #[error("password hashing failure: {0}")]
@@ -411,7 +431,8 @@ impl IntoResponse for ApiError {
             | ApiError::InvalidEmail
             | ApiError::EmptyBody
             | ApiError::TooLong
-            | ApiError::InvalidTier => (
+            | ApiError::InvalidTier
+            | ApiError::BadRequest(_) => (
                 StatusCode::BAD_REQUEST,
                 "https://memberclub.test/problems/invalid-input",
                 "Bad Request",
