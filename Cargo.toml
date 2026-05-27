@@ -16,6 +16,7 @@ members = [
     "projects/13-load-test",
     "projects/14-sagas",
     "projects/15-capacity-planner",
+    "projects/16-event-sourcing",
     "apps/memberclub/api",
     "xtask",
 ]

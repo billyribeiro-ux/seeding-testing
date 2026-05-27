@@ -1,0 +1,13 @@
+[package]
+name = "event-sourcing"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+description = "Phase 11 stretch — event sourcing + CQRS lab. Placeholder; agent fills it in."
+
+[lib]
+path = "src/lib.rs"
+
+[lints.rust]
+unsafe_code = "forbid"
