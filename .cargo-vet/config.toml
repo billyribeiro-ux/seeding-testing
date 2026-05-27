@@ -1,0 +1,81 @@
+# cargo-vet configuration for the MemberClub workspace.
+#
+# `cargo vet` enforces that every third-party crate version we depend
+# on has been audited by a human. The "human" can be us (see
+# audits.toml) or one of the trusted organizations imported below.
+#
+# Workflow:
+#   1. After adding a dep, run `cargo vet` — if the version is
+#      covered by an imported audit set, you're done.
+#   2. If not covered, run `cargo vet inspect <crate> <version>` to
+#      open the source diff, review it, then
+#      `cargo vet certify <crate> <version>` to record your audit.
+#   3. Commit the resulting changes to `.cargo-vet/audits.toml`.
+#
+# See docs/security/03-supply-chain.md for the broader playbook.
+
+[cargo-vet]
+version = "0.10"
+
+# -----------------------------------------------------------------------------
+# Trusted publishers
+# -----------------------------------------------------------------------------
+# Crates published by these GitHub users are auto-trusted (subject to the
+# user opting into publishing via vet, which the rust-lang team does).
+# Keep this list short and well-known. Each addition is a trust decision.
+
+[[trusted]]
+criteria = "safe-to-deploy"
+user-id = 5430905           # ehuss (rust-lang) — example shape; verify ids before enabling
+start = "2019-01-01"
+end = "2026-12-31"
+notes = "rust-lang team member; signs off on official tooling crates"
+
+# Uncomment to add an additional well-known maintainer:
+# [[trusted]]
+# criteria = "safe-to-deploy"
+# user-id = 169405          # dtolnay — serde, anyhow, syn, thiserror
+# start = "2017-01-01"
+# end = "2026-12-31"
+# notes = "maintains the core serialization stack we depend on"
+
+# -----------------------------------------------------------------------------
+# Imports — trust audits done by other organizations
+# -----------------------------------------------------------------------------
+# These three orgs publish their internal audits. By importing, we
+# accept their reviews as ours (subject to the criteria filter).
+# Adding a new import expands what cargo vet considers "audited" —
+# review what each org's audit criteria mean before importing.
+
+[imports.mozilla]
+url = "https://raw.githubusercontent.com/mozilla/supply-chain/main/audits.toml"
+
+[imports.google]
+url = "https://raw.githubusercontent.com/google/supply-chain/main/audits.toml"
+
+[imports.embark]
+url = "https://raw.githubusercontent.com/EmbarkStudios/rust-ecosystem/main/audits.toml"
+
+# -----------------------------------------------------------------------------
+# Default policy
+# -----------------------------------------------------------------------------
+# Every workspace crate inherits this unless overridden below. The
+# `safe-to-deploy` criteria is the standard cargo-vet bar: "this code
+# is fit to ship in a server binary handling untrusted input."
+
+[policy.default]
+criteria = "safe-to-deploy"
+
+# Test-only crates get a weaker criteria: code we trust enough to run
+# in our test harness, not necessarily code we'd ship to prod.
+#
+# [policy."some-test-helper"]
+# criteria = "safe-to-run"
+
+# -----------------------------------------------------------------------------
+# Audit-as-crates-io
+# -----------------------------------------------------------------------------
+# When true, cargo-vet considers the crates.io publisher of each crate
+# as evidence (weaker than a code audit, but real). Off by default —
+# we want explicit audits, not "the publisher seems legitimate."
+audit-as-crates-io = false

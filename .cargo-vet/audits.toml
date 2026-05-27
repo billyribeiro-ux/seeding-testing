@@ -1,0 +1,50 @@
+# cargo-vet audits authored by the MemberClub team.
+#
+# Each entry in `[[audits.<crate>]]` records that a human read the
+# source of a specific crate version and is satisfied that the code
+# is fit for its declared criteria (typically `safe-to-deploy`).
+#
+# To add an audit:
+#   $ cargo vet certify <crate> <version>
+#
+# The tool will prompt for the criteria and add a properly-formed
+# entry to this file. Do not hand-edit unless you understand the
+# schema in https://mozilla.github.io/cargo-vet/audit-entries.html.
+#
+# This file is committed to git. Audits are credentials — they speak
+# for the team's review claim. Review changes in PR like any other
+# security artifact.
+
+# -----------------------------------------------------------------------------
+# Criteria definitions
+# -----------------------------------------------------------------------------
+# `safe-to-deploy` and `safe-to-run` are the two cargo-vet built-ins.
+# We define one extra criteria below as a worked example — adapt or
+# remove as the workspace's needs evolve.
+
+[criteria.crypto-reviewed]
+description = """
+This crate has had its cryptographic implementation reviewed by
+someone qualified to evaluate constant-time properties, side-channel
+resistance, and primitive selection. Apply only to crates we use for
+key material handling (argon2, hmac, sha2, jsonwebtoken, ring, etc.).
+"""
+implies = "safe-to-deploy"
+
+# -----------------------------------------------------------------------------
+# Audits
+# -----------------------------------------------------------------------------
+# Seed: empty. Populate via `cargo vet certify` as the team reviews
+# crates that aren't covered by the imported Mozilla / Google /
+# Embark audit sets.
+#
+# Example shape (do not enable without an actual review):
+#
+# [[audits.tiny-utility-crate]]
+# who = "your.name@memberclub.com"
+# criteria = "safe-to-deploy"
+# version = "0.3.2"
+# notes = """
+# Reviewed all 87 lines of src/. No unsafe, no build.rs, no network
+# or filesystem access. Pure-function leftpad-style utility.
+# """

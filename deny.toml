@@ -9,6 +9,11 @@ db-path           = "~/.cargo/advisory-db"
 db-urls           = ["https://github.com/rustsec/advisory-db"]
 ignore            = []                         # add RUSTSEC-IDs here only with a written rationale + expiry
 yanked            = "warn"
+# Newer cargo-deny derives vulnerability/unmaintained behavior from the
+# advisory severity rather than explicit knobs, but documenting the
+# intent here keeps reviewers honest: vulnerabilities should fail the
+# build, unmaintained should at least warn. If we suppress a finding,
+# the suppression goes in `ignore` above with rationale + expiry.
 
 [licenses]
 unused-allowed-license = "allow"
@@ -27,6 +32,11 @@ allow = [
     "OpenSSL",
 ]
 confidence-threshold = 0.93
+# GPL-family licenses are intentionally NOT in the allowlist. Any
+# transitive dep that pulls in GPL-2.0 / GPL-3.0 / AGPL-3.0 / LGPL
+# would taint the dual MIT/Apache-2.0 licensing of the workspace, so
+# the absence here causes the build to fail and forces the discussion.
+# See docs/security/03-supply-chain.md for the rationale.
 
 [bans]
 multiple-versions = "warn"
@@ -35,6 +45,15 @@ deny = [
     # Avoid Tokio v0.x (legacy)
     { name = "tokio", version = "<1.0" },
 ]
+# Crypto duplicate-version foot-guns. Two TLS/crypto stacks loaded into
+# the same process is the classic source of "which entropy pool did I
+# use?" bugs. Calling these out here lets us escalate to `deny` if the
+# workspace ever resolves to two versions of any of them. See the
+# duplicate-version warning above; if it fires on one of these, treat
+# it as a build failure pending investigation.
+skip-tree = []
+# When we move from warn → deny, list the crates here as
+# `{ crate = "openssl" }` etc. and re-run `cargo deny check`.
 
 [sources]
 unknown-registry = "deny"
