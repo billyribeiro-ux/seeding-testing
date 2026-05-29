@@ -49,22 +49,35 @@ pub struct AppState {
     pub metrics: Arc<PrometheusHandle>,
 }
 
+/// Process-global Prometheus render handle.
+///
+/// The `metrics` crate has exactly one process-wide recorder. The first
+/// `AppState::new` installs it and keeps the handle that renders it; every
+/// later `AppState` must reuse *that same* handle. If each `AppState` built
+/// its own handle, only the first would point at the recorder that the
+/// `record_metrics` middleware actually writes into — so a second `AppState`
+/// (e.g. a later test in the same `cargo test` process) would render an empty
+/// registry. Caching the handle in a `OnceLock` makes `/metrics` deterministic
+/// under both `cargo test` (one process, many tests) and `cargo nextest`
+/// (process per test).
+static METRICS_HANDLE: std::sync::OnceLock<PrometheusHandle> = std::sync::OnceLock::new();
+
 impl AppState {
-    /// Create a fresh `AppState`. Installs a process-global Prometheus
-    /// recorder if one isn't already installed (idempotent — safe in tests).
+    /// Create a fresh `AppState`, reusing the process-global Prometheus
+    /// recorder (installed exactly once — safe to call repeatedly in tests).
     #[must_use]
     pub fn new(pool: SqlitePool) -> Self {
-        let metrics = match PrometheusBuilder::new().install_recorder() {
-            Ok(handle) => Arc::new(handle),
-            Err(_) => {
-                // A recorder is already installed (e.g. from a previous test
-                // in the same process). Reach into the global to grab its
-                // render handle. We do this via a fresh dedicated recorder
-                // we keep alive via an Arc on the side; metrics still flow
-                // to the *first* recorder, but `render()` works.
-                Arc::new(PrometheusBuilder::new().build_recorder().handle())
+        let handle = METRICS_HANDLE.get_or_init(|| {
+            match PrometheusBuilder::new().install_recorder() {
+                Ok(handle) => handle,
+                // Another component already owns the global recorder; fall
+                // back to a local one so `render()` still works. (No metrics
+                // flow into it, but this path only happens if something other
+                // than `AppState` installed a recorder first.)
+                Err(_) => PrometheusBuilder::new().build_recorder().handle(),
             }
-        };
+        });
+        let metrics = Arc::new(handle.clone());
 
         metrics::describe_counter!(
             "http_requests_total",

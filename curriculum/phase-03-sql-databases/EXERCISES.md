@@ -255,7 +255,7 @@ CREATE TABLE charges (
     id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     idempotency_key UUID NOT NULL UNIQUE,
     user_id         BIGINT NOT NULL REFERENCES users(id),
-    amount_cents    BIGINT NOT NULL CHECK (amount_cents > 0 AND amount_cents < 2_100_000_000_00),
+    amount_cents    BIGINT NOT NULL CHECK (amount_cents > 0 AND amount_cents < 2100000000000),
     stripe_id       TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

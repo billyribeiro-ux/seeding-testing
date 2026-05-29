@@ -51,7 +51,7 @@ use proptest::prelude::*;
 
 proptest! {
     #[test]
-    fn cents_round_trip(c in 0i64..2_100_000_000_00) {
+    fn cents_round_trip(c in 0i64..2_100_000_000_000) {
         let m = Money::new(c, Currency::USD).unwrap();
         prop_assert_eq!(m.cents, c);
     }
