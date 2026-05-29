@@ -32,9 +32,9 @@ CREATE TABLE invoices (
     id                    BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     stripe_id             TEXT NOT NULL UNIQUE,
     user_id               BIGINT NOT NULL REFERENCES users(id),
-    subtotal_cents        BIGINT NOT NULL CHECK (subtotal_cents >= 0 AND subtotal_cents < 2_100_000_000_00),
-    tax_cents             BIGINT NOT NULL CHECK (tax_cents >= 0 AND tax_cents < 2_100_000_000_00),
-    total_cents           BIGINT NOT NULL CHECK (total_cents >= 0 AND total_cents < 2_100_000_000_00),
+    subtotal_cents        BIGINT NOT NULL CHECK (subtotal_cents >= 0 AND subtotal_cents < 2100000000000),
+    tax_cents             BIGINT NOT NULL CHECK (tax_cents >= 0 AND tax_cents < 2100000000000),
+    total_cents           BIGINT NOT NULL CHECK (total_cents >= 0 AND total_cents < 2100000000000),
     currency              CHAR(3) NOT NULL,
     status                TEXT NOT NULL,                  -- 'draft'|'open'|'paid'|'void'|'uncollectible'
     invoice_pdf_url       TEXT,                           -- Stripe-hosted PDF

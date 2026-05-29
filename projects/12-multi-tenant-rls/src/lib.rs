@@ -1,7 +1,7 @@
 //! multi-tenant-rls — the policy layer that builds the SQL for
 //! tenant-isolated, row-level-secured Postgres tables.
 //!
-//! The pattern (from `docs/01-architecture-decisions/0007-postgres-row-level-security.md`):
+//! The pattern (from `docs/01-architecture-decisions/0007-postgres-rls-tenant-isolation.md`):
 //!
 //!   1. Every tenant-scoped table has a `tenant_id UUID NOT NULL`.
 //!   2. The table has RLS enabled: `ALTER TABLE x ENABLE ROW LEVEL
@@ -22,10 +22,10 @@
 //!   * [`set_local_tenant_sql`] — the exact `SET LOCAL` statement the
 //!     app issues at the top of every request transaction.
 //!
-//! The integration test in `tests/rls.rs` is gated on a real
-//! `DATABASE_URL` — when run against Postgres it proves the policy
-//! actually blocks cross-tenant reads. When the env var is absent the
-//! test is `#[ignore]`'d so `make verify` stays hermetic.
+//! A real-DB integration test (`tests/rls.rs`, gated on a `DATABASE_URL`
+//! and skipped when it is absent so `make verify` stays hermetic) is the
+//! curriculum exercise: once Postgres is up, the learner writes it to
+//! prove the policy actually blocks cross-tenant reads.
 
 use std::fmt::Write as _;
 

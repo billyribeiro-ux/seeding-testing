@@ -29,8 +29,9 @@ make verify
 | File | Purpose |
 |---|---|
 | `migrations/20260526120000_create_notes.sql` | The schema migration |
-| `src/lib.rs` | `list`, `add`, `delete`, `get`, `migrate`, plus `Note` and `NotesError` |
-| `tests/notes.rs` | 12 integration tests over an in-memory SQLite pool |
+| `src/lib.rs` | `list`, `list_keyset`, `add`, `update`, `delete`, `get`, `migrate`, plus `Note` and `NotesError` |
+| `src/factory.rs` | `factory::note()` test-data builder (Phase 5 — E5.4) |
+| `tests/notes.rs` | 21 integration tests over an in-memory SQLite pool |
 
 ## Why sqlx + raw SQL?
 

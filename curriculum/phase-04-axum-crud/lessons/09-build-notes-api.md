@@ -184,7 +184,7 @@ async fn create_then_list() {
 ## Step 7 — Verify
 
 ```bash
-cargo test  -p notes-api               # 9/9 green
+cargo test  -p notes-api               # all green
 cargo clippy -p notes-api -- -D warnings
 cargo fmt    -p notes-api -- --check
 cargo run   -p notes-api               # listens on 127.0.0.1:3000
@@ -207,7 +207,7 @@ curl -s -i http://localhost:3000/v1/notes/999
 
 ## Green-bar checkpoint
 
-- `cargo test -p notes-api` shows 9 passed.
+- `cargo test -p notes-api` is green (the `tests/api.rs` integration suite plus the unit and snapshot tests).
 - You can curl every endpoint and see the documented behaviour.
 - You can explain why the library is reused as a workspace dep instead of copy-pasted.
 

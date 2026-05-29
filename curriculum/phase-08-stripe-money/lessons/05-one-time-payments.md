@@ -75,7 +75,7 @@ CREATE TABLE pending_purchases (
     idempotency_key TEXT NOT NULL UNIQUE,
     user_id         BIGINT NOT NULL REFERENCES users(id),
     product         TEXT NOT NULL,                          -- 'workshop_pass'
-    amount_cents    BIGINT NOT NULL CHECK (amount_cents > 0 AND amount_cents < 2_100_000_000_00),
+    amount_cents    BIGINT NOT NULL CHECK (amount_cents > 0 AND amount_cents < 2100000000000),
     currency        CHAR(3) NOT NULL,
     stripe_session_id TEXT UNIQUE,
     status          TEXT NOT NULL DEFAULT 'pending',         -- 'pending'|'completed'|'expired'
@@ -88,7 +88,7 @@ CREATE TABLE payments (
     user_id         BIGINT NOT NULL REFERENCES users(id),
     stripe_charge_id TEXT NOT NULL UNIQUE,
     stripe_payment_intent_id TEXT NOT NULL,
-    amount_cents    BIGINT NOT NULL CHECK (amount_cents > 0 AND amount_cents < 2_100_000_000_00),
+    amount_cents    BIGINT NOT NULL CHECK (amount_cents > 0 AND amount_cents < 2100000000000),
     currency        CHAR(3) NOT NULL,
     succeeded_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

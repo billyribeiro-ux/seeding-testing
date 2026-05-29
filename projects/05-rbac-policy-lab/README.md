@@ -31,7 +31,7 @@ Or `make verify` from the repo root.
 | File | Purpose |
 |---|---|
 | `src/lib.rs` | Domain types, `Forbidden`, all `can_*` policy functions, `require!` macro, `test_support` module with builders |
-| `tests/policy.rs` | 28 tests — the policy spec |
+| `tests/policy.rs` | 31 tests (28 example-based + 3 property) — the policy spec |
 
 ## Why no HTTP?
 

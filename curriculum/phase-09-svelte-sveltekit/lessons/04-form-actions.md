@@ -1,6 +1,6 @@
 # Lesson 9.4 — Form Actions and Progressive Enhancement
 
-> **Concept first:** a form action is a server-side handler attached to a `<form>` element. SvelteKit calls it on submit, returns data, re-renders. Without JS this is a full page reload; with JS it's a fetch under the hood. The code is the same.
+> **Concept first:** a form action is a server-side handler attached to a `<form>` element. SvelteKit calls it on submit, returns data, re-renders. A plain form does a full page reload on submit. Add `use:enhance` and the *same* action runs over `fetch` with no reload — same server code either way.
 > **Time:** 20 minutes.
 
 ## A minimal example
@@ -38,12 +38,14 @@ export const actions: Actions = {
 
 Three behaviors to understand:
 
-1. **No JavaScript path.** Browser submits the form, server runs the
-   `create` action, returns HTML. The page re-renders with `form` set to
-   the action's return value.
-2. **JavaScript path** (SvelteKit auto-enhanced). The submission becomes a
-   `fetch`, the page doesn't reload, but `form` still gets the action's
-   return value.
+1. **Plain form (no `use:enhance`).** The browser does a native POST, the
+   server runs the `create` action, and returns HTML. The page does a full
+   reload and re-renders with `form` set to the action's return value. This
+   is the default — it works even with JavaScript disabled.
+2. **Enhanced form (`use:enhance`).** Opt in and the submission becomes a
+   `fetch`; the page doesn't reload, but `form` still gets the action's
+   return value. SvelteKit does *not* enhance forms automatically — you add
+   `use:enhance` yourself (see below).
 3. **Named actions.** `action="?/create"` matches `actions.create`. You can
    have many actions on one page.
 
@@ -78,8 +80,11 @@ Then in the page:
 
 ## `use:enhance` — tweaking the enhancement
 
-By default, SvelteKit enhances every form. For custom behavior (optimistic
-UI, focus management, progress indicators), use `use:enhance`:
+Enhancement is opt-in: add the `use:enhance` action to a form and SvelteKit
+intercepts the submit, runs the action over `fetch`, and applies the result
+without a full reload. With no arguments it gives you the sensible default
+behavior; pass a callback for custom behavior (optimistic UI, focus
+management, progress indicators):
 
 ```svelte
 <script>
@@ -100,8 +105,9 @@ UI, focus management, progress indicators), use `use:enhance`:
 </form>
 ```
 
-For most cases the default enhancement is enough. Reach for `use:enhance`
-when you need extra UX polish.
+For most cases bare `use:enhance` (no callback) is enough — it updates
+`form`, the page data, and focus for you. Pass a callback only when you need
+extra UX polish.
 
 ## Files and binary data
 

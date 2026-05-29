@@ -261,9 +261,10 @@ intersection is operationally manageable:
 - Both demand breach notification (GDPR's 72-hour clock is stricter;
   the HIPAA timeline is the long pole *after* you've met the GDPR one).
 - GDPR's right of erasure conflicts with HIPAA's record-retention
-  rules — providers must retain medical records for years. HIPAA
-  generally takes precedence under GDPR Article 9 (legal obligation),
-  but document the decision.
+  rules — providers must retain medical records for years. The
+  retention obligation generally takes precedence via the erasure
+  exception in GDPR Article 17(3)(b) (processing necessary for
+  compliance with a legal obligation), but document the decision.
 - Cross-border transfer: PHI of an EU resident cannot be transferred
   to the US without GDPR-grade safeguards (SCCs, adequacy). HIPAA
   doesn't speak to cross-border at all.

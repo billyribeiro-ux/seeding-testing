@@ -24,7 +24,7 @@ this.
 ## Construction — bounded at birth
 
 ```rust
-pub const MONEY_CEILING_CENTS: i64 = 2_100_000_000_00;
+pub const MONEY_CEILING_CENTS: i64 = 2_100_000_000_000;
 
 impl Money {
     pub fn new(cents: i64, currency: Currency) -> Result<Money, MoneyError> {
@@ -129,7 +129,7 @@ In the DB, money is two columns: `amount_cents BIGINT NOT NULL` and
 CREATE TABLE invoices (
     ...
     amount_cents BIGINT NOT NULL CHECK (
-        amount_cents > -2_100_000_000_00 AND amount_cents < 2_100_000_000_00
+        amount_cents > -2100000000000 AND amount_cents < 2100000000000
     ),
     currency CHAR(3) NOT NULL CHECK (currency IN ('USD','EUR','GBP','JPY')),
     ...

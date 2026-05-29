@@ -28,18 +28,25 @@ You don't *have* to wrap every policy in a struct; the project uses plain `pub f
 
 ## The `require!` macro (the actual one used in the capstone)
 
+`rbac-policy-lab` is a *pure* policy library: the macro returns the
+`Forbidden` value directly, so the caller's function must itself return
+`Result<_, Forbidden>`. In a real HTTP service you'd wrap `Forbidden` in
+your own `ApiError::Forbidden(reason)` at the handler boundary (the
+auth-demo error type already shows that shape) — the library stays free
+of any web dependency.
+
 ```rust
 #[macro_export]
 macro_rules! require {
     ($result:expr) => {
         match $result {
             Ok(()) => (),
-            Err(reason) => return Err(crate::Forbidden::Wrap(reason).into()),
+            Err(reason) => return Err(reason),
         }
     };
     ($cond:expr, $reason:expr) => {
         if !$cond {
-            return Err($reason.into());
+            return Err($reason);
         }
     };
 }
@@ -48,8 +55,8 @@ macro_rules! require {
 Two forms:
 
 ```rust
-require!(policy::can_edit_doc(user, &doc, &ctx));   // pass-through of Result
-require!(user.is_admin(), Forbidden::NotAdmin);     // inline assertion + reason
+require!(can_edit_doc(user, &doc, &ctx));        // pass-through of a PolicyResult
+require!(user.is_admin(), Forbidden::NotAdmin);  // inline assertion + reason
 ```
 
 Both desugar to "return early with a typed forbidden error." Clean, greppable, hard to skip.
@@ -57,21 +64,25 @@ Both desugar to "return early with a typed forbidden error." Clean, greppable, h
 ## The `Forbidden` enum
 
 ```rust
-#[derive(Debug, Clone, Copy, thiserror::Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum Forbidden {
-    #[error("not authenticated")]    NotAuthenticated,
-    #[error("not an admin")]         NotAdmin,
-    #[error("not the owner")]        NotOwner,
-    #[error("wrong tenant")]         WrongTenant,
-    #[error("tier too low")]         InsufficientTier,
-    #[error("email not verified")]   EmailNotVerified,
-    #[error("not published")]        NotPublished,
-    #[error("step-up required")]     StepUpRequired,
-    #[error("unsupported")]          Unsupported,
+    #[error("not authenticated")]              NotAuthenticated,
+    #[error("email not verified")]             EmailNotVerified,
+    #[error("not the owner")]                  NotOwner,
+    #[error("not an admin")]                   NotAdmin,
+    #[error("not a moderator or admin")]       NotModerator,
+    #[error("wrong tenant")]                   WrongTenant,
+    #[error("tier too low")]                   InsufficientTier,
+    #[error("not published")]                  NotPublished,
+    #[error("step-up authentication required")] StepUpRequired,
+    #[error("cannot remove the last admin")]   LastAdmin,
 }
 ```
 
-`impl From<Forbidden> for ApiError` turns each variant into the same wire-level `403` (with the reason in logs/audit, not the body).
+Deriving `PartialEq, Eq` is what lets the test suite assert the *exact*
+denial reason (`assert_eq!(can_read_doc(...), Err(Forbidden::WrongTenant))`).
+In a real HTTP service, an `impl From<Forbidden> for ApiError` turns each
+variant into the same wire-level `403` (with the reason in logs/audit, not the body).
 
 ## How handlers use it
 

@@ -16,7 +16,7 @@ Three corollaries that decide every Stripe argument:
 
 1. **Storage: `i64` cents only.** No `f64`. The Postgres column type is
    `BIGINT NOT NULL`, with a `CHECK` constraint binding values to the
-   **$21 billion ceiling** (`MONEY_CEILING_CENTS = 2_100_000_000_00`).
+   **$21 billion ceiling** (`MONEY_CEILING_CENTS = 2_100_000_000_000`).
 2. **Stripe is not the source of truth.** Our DB owns customers,
    subscriptions, invoices, payments. Stripe is the *rail*. We mirror Stripe
    events; we never read Stripe synchronously in a user-facing path.
@@ -30,7 +30,7 @@ Three corollaries that decide every Stripe argument:
 |---|---|
 | `lessons/01-money-not-a-float.md` | Why floats fail, history of "off by a penny" disasters |
 | `lessons/02-the-money-newtype.md` | `Money(i64, Currency)`, ceiling, checked arithmetic, proptest |
-| `lessons/03-proportional-split.md` | Banker's rounding, sums-exactly invariant |
+| `lessons/03-proportional-split.md` | Largest-remainder method, sums-exactly invariant |
 | `lessons/04-stripe-data-model.md` | Customer / PaymentMethod / Product / Price / Subscription / Invoice / Charge |
 | `lessons/05-one-time-payments.md` | Checkout Session → PaymentIntent flow |
 | `lessons/06-recurring-subscriptions.md` | Trials, proration, plan change, cancel-at-period-end |
@@ -44,7 +44,8 @@ Three corollaries that decide every Stripe argument:
 ## The capstones
 
 - **`projects/06-stripe-money-lab`** — Pure Rust. The `Money` newtype, the
-  ceiling enforcement, the proportional split with banker's rounding. Proptest
+  ceiling enforcement, the proportional split via the largest-remainder
+  method. Proptest
   proves invariants ("sum of split parts equals original," "checked arithmetic
   never silently overflows"). No I/O — fast, deterministic, mathematically
   rigorous.

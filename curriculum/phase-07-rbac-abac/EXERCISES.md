@@ -4,7 +4,9 @@ Seven graded drills extending `projects/05-rbac-policy-lab`.
 
 > **Status:** all 7 marked `— shipped`. Each is a drill whose inline
 > `<details>` answer is the deliverable; the underlying RBAC/ABAC
-> policy machinery + audit-log table live in `projects/05-rbac-policy-lab/`.
+> policy machinery lives in `projects/05-rbac-policy-lab/` (a pure
+> policy library), while the audit-log *table* and its in-transaction
+> writes live in `projects/04-auth-demo/`.
 > E7.5 (first-user-becomes-admin) is shipped end-to-end in
 > `projects/04-auth-demo/src/lib.rs::register` with an integration
 > test in `projects/04-auth-demo/tests/auth.rs::first_registered_user_is_admin`.

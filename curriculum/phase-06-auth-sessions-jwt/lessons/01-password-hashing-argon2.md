@@ -56,15 +56,23 @@ The stored hash is a single PHC-formatted string that *includes the parameters u
 
 ## Parameters (knobs and 2026 defaults)
 
-| Parameter | What it controls | 2026 recommendation |
+| Parameter | What it controls | OWASP 2026 recommendation |
 |---|---|---|
-| `m_cost` | Memory used (KiB) | ≥ 65 536 (64 MB) |
-| `t_cost` | Iterations | ≥ 3 |
-| `p_cost` | Parallelism | ≥ 1 (most servers don't benefit from > 1) |
+| `m_cost` | Memory used (KiB) | ≥ 19 456 (19 MB); prefer 65 536 (64 MB) where you can afford it |
+| `t_cost` | Iterations | ≥ 2 (3 with the 19 MB profile) |
+| `p_cost` | Parallelism | 1 (most servers don't benefit from > 1) |
 | salt length | | 16 bytes |
 | output length | | 32 bytes |
 
-`Argon2::default()` in the crate produces those defaults. Measure your server: aim for **~100 ms per hash** under load. Faster than that is too easy for attackers; slower than that hurts UX.
+OWASP publishes several equally-acceptable Argon2id profiles; the two most common are **m=19 MB, t=2, p=1** and **m=64 MB, t=3, p=1**. `Argon2::default()` in the `argon2` crate produces the first of these (`m_cost = 19456`, `t_cost = 2`, `p_cost = 1`, 32-byte output) — a secure baseline, *not* the 64 MB profile. If you want the heavier profile, build `Params` explicitly:
+
+```rust
+use argon2::{Argon2, Params, Version, Algorithm};
+let params = Params::new(65_536, 3, 1, None).expect("valid params");
+let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
+```
+
+Measure your server: aim for **~100 ms per hash** under load. Faster than that is too easy for attackers; slower than that hurts UX.
 
 ## Re-hashing on login (parameter upgrades)
 

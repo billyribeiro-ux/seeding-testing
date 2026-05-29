@@ -26,7 +26,7 @@ CREATE TABLE refunds (
     id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     stripe_id       TEXT NOT NULL UNIQUE,
     payment_id      BIGINT NOT NULL REFERENCES payments(id),
-    amount_cents    BIGINT NOT NULL CHECK (amount_cents > 0 AND amount_cents < 2_100_000_000_00),
+    amount_cents    BIGINT NOT NULL CHECK (amount_cents > 0 AND amount_cents < 2100000000000),
     currency        CHAR(3) NOT NULL,
     reason          TEXT NOT NULL,
     actor_id        BIGINT REFERENCES users(id),       -- the admin who issued it (NULL = system)
@@ -84,7 +84,7 @@ CREATE TABLE disputes (
     id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     stripe_id       TEXT NOT NULL UNIQUE,
     payment_id      BIGINT NOT NULL REFERENCES payments(id),
-    amount_cents    BIGINT NOT NULL CHECK (amount_cents > 0 AND amount_cents < 2_100_000_000_00),
+    amount_cents    BIGINT NOT NULL CHECK (amount_cents > 0 AND amount_cents < 2100000000000),
     currency        CHAR(3) NOT NULL,
     reason          TEXT,                                          -- 'fraudulent', 'product_not_received', ...
     status          TEXT NOT NULL,                                 -- 'needs_response'|'under_review'|'won'|'lost'

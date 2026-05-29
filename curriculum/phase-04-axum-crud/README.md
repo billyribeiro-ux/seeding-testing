@@ -14,7 +14,7 @@ Three habits we'll cement in this phase:
 
 1. **Logic in a library, plumbing in a binary.** Same split as `hello-cli` and `quote-generator`. The `notes` business logic moves out of the data layer (`sqlx-notes`) into a service crate; the HTTP layer is the thinnest possible adapter.
 2. **Errors map to HTTP at the boundary.** Internal code returns `Result<T, NotesError>`. An `IntoResponse` impl translates each variant into a `StatusCode` + a problem-details JSON body (RFC 7807).
-3. **Every public endpoint is documented in OpenAPI** — generated from the code via `utoipa`, served at `/openapi.json` and a Swagger UI at `/docs`.
+3. **Every public endpoint is documented in OpenAPI** — generated from the code via `utoipa` and served at `/openapi.json`. (Swagger UI at `/docs` is shown in Lesson 4.7 as the pattern, but left out of the shipped capstone to avoid embedding the swagger-ui asset — see E4.7.)
 
 ## The phase plan
 
@@ -40,7 +40,7 @@ A real Axum service that wraps the `sqlx-notes` library with:
 - `PATCH  /v1/notes/:id`        — update
 - `DELETE /v1/notes/:id`        — delete
 - `GET    /healthz`             — health probe
-- `GET    /openapi.json` + `/docs` — OpenAPI 3.1 + Swagger UI
+- `GET    /openapi.json`        — OpenAPI 3.1 spec (utoipa-generated; Swagger UI is left as an optional add-on — see E4.7)
 
 Backed by **SQLite** through `sqlx-notes` (so the project builds without Docker), with the migration plan for Postgres documented inline. Integration tests via `axum::Router::oneshot` (no real HTTP listener; pure in-process).
 

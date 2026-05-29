@@ -12,7 +12,7 @@
 | `Json<T>` | Parses `application/json` body into `T` |
 | `Form<T>` | Parses `application/x-www-form-urlencoded` body into `T` |
 | `Bytes` / `String` | Raw body (for custom parsing) |
-| `Headers`, `HeaderMap` | Headers |
+| `HeaderMap` | All request headers |
 | `Extension<T>` | Looks up a value injected by middleware |
 | `State<S>` | Application state |
 | `axum_extra::TypedHeader<T>` | Parsed typed header (Cookie, Authorization, …) |

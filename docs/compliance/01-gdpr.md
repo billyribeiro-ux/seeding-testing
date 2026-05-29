@@ -52,8 +52,8 @@ Engineering consequences:
   don't collect.
 - Logs that capture full request bodies will capture PII that you have
   no business retaining. Either filter at the logging layer or redact
-  before write. See [`docs/security/04-transport-headers.md`](../security/04-transport-headers.md)
-  for the redaction layer pattern.
+  before write. See [`docs/security/01-stride-threat-model.md`](../security/01-stride-threat-model.md)
+  (threat I-3, "secrets in logs") for the field-filtering pattern.
 - Backups inherit whatever was in the source database. If you collected
   too much, your backups now hold it too. Deleting from production
   doesn't delete from a 90-day-old backup tape.

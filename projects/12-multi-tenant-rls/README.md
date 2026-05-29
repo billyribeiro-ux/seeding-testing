@@ -3,7 +3,7 @@
 Phase 11 lab — multi-tenant Postgres with row-level security.
 
 The pattern (documented in ADR
-`docs/01-architecture-decisions/0007-postgres-row-level-security.md`):
+`docs/01-architecture-decisions/0007-postgres-rls-tenant-isolation.md`):
 
   1. Every tenant-scoped table has `tenant_id UUID NOT NULL`.
   2. `ALTER TABLE x ENABLE ROW LEVEL SECURITY;`

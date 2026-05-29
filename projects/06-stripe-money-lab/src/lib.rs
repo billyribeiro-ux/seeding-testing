@@ -22,7 +22,7 @@ use thiserror::Error;
 /// 1. Vastly larger than any realistic single-row amount.
 /// 2. Leaves headroom for intermediate multiplications inside DB functions
 ///    without approaching `i64::MAX / 100`.
-pub const MONEY_CEILING_CENTS: i64 = 210_000_000_000;
+pub const MONEY_CEILING_CENTS: i64 = 2_100_000_000_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Currency {

@@ -60,8 +60,9 @@ cargo llvm-cov --workspace --lcov --output-path lcov.info
 cargo llvm-cov report                    # human-readable
 cargo llvm-cov --fail-under-lines 80     # CI gate
 
-# Seed CLI
-cargo run -p notes-api --bin notes-seed -- --profile dev
+# Seed CLI (point DATABASE_URL at a file so the rows persist — the
+# binary defaults to an in-memory DB that vanishes on exit)
+DATABASE_URL=sqlite://./dev.sqlite cargo run -p notes-api --bin notes-seed -- --profile dev
 sqlite3 ./dev.sqlite "SELECT COUNT(*) FROM notes;"     # ~20
 ```
 

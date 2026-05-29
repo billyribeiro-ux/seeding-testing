@@ -41,16 +41,22 @@ Four inputs: who, what, on what, in what context. One output: ok or a specific r
 
 ## The capstone — `projects/05-rbac-policy-lab`
 
-A "Documents" service where every CRUD route is policy-gated:
+A **pure policy library** (no HTTP, no DB, no Axum) for a "Documents" domain. The
+plumbing — routing, extractors, the audit-log *table* — was already taught in
+Phases 4 and 6; Phase 7 isolates the policy logic so it reads like a textbook of
+patterns:
 
-- **Roles:** `member`, `moderator`, `admin`.
-- **Permissions:** `doc.read`, `doc.write`, `doc.delete`, `doc.publish`, `admin.*`.
-- **Ownership policy:** a member can read/write their own docs; a moderator can read/hide anyone's; an admin can do anything.
+- **Roles:** `member`, `moderator`, `admin`, `owner`.
+- **Resources:** documents carry an `owner_id`, an `org_id`, a `min_tier`, and a publish state.
+- **Ownership policy:** a member can read/write their own docs; a moderator can write/publish within their org; an admin can do anything (subject to step-up on deletes/grants).
 - **Tier policy:** docs have a `min_tier` (`free`, `pro`, `elite`); readers must meet or exceed it.
-- **Audit log:** every privileged action writes a row in the same transaction.
-- **Tests:** every policy has at least two tests — one that *should* allow, one that *should* deny.
+- **Tenancy + step-up:** cross-tenant access is denied unless admin; sensitive admin actions require a fresh TOTP check.
+- **Tests:** every policy has at least one allow test and one deny test per distinct branch — the test file *is* the spec.
 
-Backed by SQLite for hard-evidence integration testing, same pattern as Phase 4 / 6.
+The decision functions return `Forbidden` directly; a real service wraps that in
+its own `ApiError` at the handler boundary (exactly the shape `auth-demo` already
+demonstrates). No SQLite — the library is pure logic, tested as plain Rust plus a
+few property tests.
 
 ## Green-bar checkpoint
 

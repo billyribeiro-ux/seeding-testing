@@ -67,23 +67,24 @@ $ oha -z 60s -c 50 --no-tui http://localhost:3000/v1/notes
 ## Results — before
 Success: 100%
 Throughput: ~1500 RPS
-p50: 32ms; p95: 91ms; p99: 162ms
+p50: 28ms; p95: 83ms; p99: 162ms
 
 ## Hypothesis
-The page renders all 20 notes' bodies, but most users only see 10.
-Limit defaults to 10, save ~30% serialization cost.
+With no `limit` the endpoint serializes all 100 000 notes, even though
+most callers only want the first page. Capping the default to 20 should
+cut serialization cost dramatically.
 
 ## Change
-PR #42: reduce default limit from 20 to 10.
+PR #4242: default `limit` from "no cap" to 20.
 
 ## Results — after
 Success: 100%
-Throughput: ~2100 RPS (+40%)
-p50: 22ms; p95: 64ms; p99: 119ms
+Throughput: ~2600 RPS (+75%)
+p50: 15ms; p95: 51ms; p99: 113ms
 ```
 
 Commit it to `docs/perf/notes-api-2026-05-26.md`. Future engineers
-*will* read this when they want to understand why the default is 10.
+*will* read this when they want to understand why the default is 20.
 
 ## What to measure
 

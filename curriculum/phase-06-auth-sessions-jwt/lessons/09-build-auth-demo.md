@@ -17,7 +17,7 @@ projects/04-auth-demo/
     ├── sessions.rs        ← session insert/find/revoke, token_hash
     └── jwt.rs             ← HS256 access + refresh tokens
 └── tests/
-    └── auth.rs            ← 11 integration tests
+    └── auth.rs            ← 12 core integration tests (the shipped exercises add more files)
 ```
 
 The split mirrors the responsibilities. Each module is independently testable.
@@ -127,7 +127,7 @@ If you change the service and any of these fails, you broke an invariant — *in
 
 ## Green-bar checkpoint
 
-- `cargo test -p auth-demo` shows 18 passed.
+- `cargo test -p auth-demo` is all green (the core `tests/auth.rs` is 12 tests; the shipped exercises — email verify, password reset, TOTP, rate-limit, RS256, refresh rotation, OAuth/magic-link — add several more test files on top). Note some DB-backed tests need a database available to run.
 - You can curl every endpoint and round-trip a login → `/me` with both transports.
 - You can articulate three reasons the demo uses HS256 and the production path uses RS256.
 

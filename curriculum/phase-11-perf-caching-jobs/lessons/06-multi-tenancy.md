@@ -47,16 +47,19 @@ The application sets the context at the start of every request, before
 any query runs:
 
 ```rust
-let mut conn = pool.acquire().await?;
+let mut tx = pool.begin().await?;
 sqlx::query("SELECT set_config('app.current_org_id', $1, true)")
     .bind(org_id.to_string())
-    .execute(&mut *conn).await?;
-// ... now any query on this connection is tenant-isolated ...
+    .execute(&mut *tx).await?;
+// ... every query on THIS transaction is now tenant-isolated ...
+tx.commit().await?;
 ```
 
-The third arg `true` makes it **transaction-local** — releases automatically
-when the connection returns to the pool. Critical: a connection that
-keeps a stale `current_org_id` would leak between requests.
+The third arg `true` makes it **transaction-local** — which is why the
+`set_config` and the tenant-scoped queries must share one transaction:
+the setting is gone the moment that transaction ends. That is exactly
+what you want with a connection pool — a connection handed back can't
+leak a stale `current_org_id` into the next request.
 
 ## The escape hatch — `BYPASSRLS`
 

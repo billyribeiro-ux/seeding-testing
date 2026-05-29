@@ -150,6 +150,7 @@ jobs:
       matrix:
         dir:
           - projects/02b-sqlite-notes-svelte
+          - projects/09-svelte-counter
           - apps/memberclub/web
     if: hashFiles(format('{0}/package.json', matrix.dir)) != ''
     steps:

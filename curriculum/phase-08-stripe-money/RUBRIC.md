@@ -5,7 +5,7 @@
 | **Money representation** | `f64` somewhere in the money path | `i64` cents, dedicated newtype | `Money(i64, Currency)`, no operator overloads, type-system-enforced |
 | **Ceiling enforcement** | No bound | App-level check at constructor | App + DB `CHECK` constraint; constants centralized |
 | **Arithmetic** | `+`/`-`/`*` silently overflows | `checked_*` returns `Result`; caller handles | All math goes through one library; proptest proves invariants |
-| **Proportional split** | `total / n` floor-rounded; off-by-one | Banker's rounding | Largest-remainder method with proptest of `sum == total` |
+| **Proportional split** | `total / n` floor-rounded; off-by-one | Floor shares + ad-hoc residue fix-up | Largest-remainder method with proptest of `sum == total` |
 | **Stripe data model** | Don't mirror; query Stripe live | Mirror Customer/Subscription/Invoice/Charge | Mirror is the source of truth; Stripe is the rail; nightly reconciliation |
 | **Idempotency keys** | None | Pass to Stripe API | Persist BEFORE the call; deterministic key generation |
 | **Webhook signature** | Trust the body | Verify HMAC after parsing | Verify *before* parsing; constant-time compare; timestamp window |

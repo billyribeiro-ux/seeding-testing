@@ -119,7 +119,7 @@ The `SignedCookieJar` automatically signs outbound cookies and verifies inbound 
 
 ## Why this matters
 
-- **HttpOnly cookies survive XSS.** An attacker who injects JavaScript into your page cannot exfiltrate the session token. localStorage tokens, by contrast, are gone.
+- **HttpOnly cookies can't be *exfiltrated* by XSS.** An attacker who injects JavaScript into your page cannot read the session token out of the cookie, so they can't steal it and replay it elsewhere — whereas a token in `localStorage` is trivially readable and gone. Be precise about the limit, though: HttpOnly does **not** make XSS harmless. While the script is running in the victim's origin, the browser still attaches the cookie to any request the script makes, so the attacker can ride the live session in-page. HttpOnly shrinks the blast radius (no durable token theft); it does not replace fixing the XSS.
 - **Server-side sessions = instant logout.** Compare with JWT-in-cookie: revoking a JWT before its expiry requires a denylist or short lifetimes plus refresh tokens. With server-side sessions, you `UPDATE one row`.
 - **Rotation on privileged actions** is a senior-engineer reflex. If an attacker stole a session through some other vector, that stolen token expires the moment the user updates their password.
 

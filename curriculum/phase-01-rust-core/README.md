@@ -37,7 +37,7 @@ Each lesson is 20–60 minutes. Do them in order. Don't skip the "Why" sections 
 A real, small command-line tool that:
 
 - Reads a file (or stdin) and counts **lines**, **words**, and **characters**.
-- Accepts flags via `clap`: `--lines`, `--words`, `--chars`, `--all`.
+- Accepts flags via `clap`: `--lines`, `--words`, `--chars` (passing none prints all three).
 - Returns proper exit codes (`0` success, `2` for missing file).
 - Has **unit tests** for every public function in `src/lib.rs`.
 - Has **integration tests** in `tests/` that run the actual binary via `assert_cmd`.
