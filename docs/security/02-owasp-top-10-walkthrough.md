@@ -114,8 +114,9 @@ chose a design that has no place to put the validation."
   outbox so failures can't dual-write inconsistently. See
   `projects/08-outbox-demo/`.
 - **Idempotent webhooks by design.**
-  `projects/07-webhook-receiver/src/lib.rs:285` (`store_event`) makes
-  duplicate delivery a no-op.
+  `projects/07-webhook-receiver/src/lib.rs:242` (`store_event` +
+  `pending_event_id`) makes duplicate delivery a no-op while still
+  resuming an event whose handler crashed before completing.
 - **Money as `i64` cents with a `Money` newtype.** Documented in
   `docs/00-mental-models/money.md` and ADR-0003. Floating-point money
   bugs are a category error here.

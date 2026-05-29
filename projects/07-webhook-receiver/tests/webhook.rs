@@ -151,6 +151,50 @@ async fn duplicate_delivery_is_idempotent() {
 }
 
 #[tokio::test]
+async fn resumes_event_stored_but_not_processed_after_a_crash() {
+    // Simulates an earlier delivery that stored the receipt row but crashed
+    // before `mark_processed`. The retry must RESUME (process it), not skip
+    // it as a finished duplicate — otherwise the side effect is lost.
+    let (app, pool) = app().await;
+    let ts = now_secs();
+    let body = sample_event("evt_crash", ts as i64);
+
+    let meta = webhook_receiver::parse_event_meta(body.as_bytes()).unwrap();
+    let id = webhook_receiver::store_event(&pool, &meta, body.as_bytes())
+        .await
+        .unwrap()
+        .expect("freshly stored");
+    let processed_before: Option<String> =
+        sqlx::query_scalar("SELECT processed_at FROM stripe_events WHERE id = ?")
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(
+        processed_before.is_none(),
+        "precondition: not yet processed"
+    );
+
+    let res = app
+        .oneshot(signed_request(TEST_SECRET, ts, &body))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    let (count, processed): (i64, Option<String>) = sqlx::query_as(
+        "SELECT COUNT(*), MAX(processed_at) FROM stripe_events WHERE stripe_event_id = 'evt_crash'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(count, 1, "still exactly one row");
+    assert!(
+        processed.is_some(),
+        "the crashed-mid-handler event must now be processed on retry"
+    );
+}
+
+#[tokio::test]
 async fn rejects_malformed_json() {
     let (app, _) = app().await;
     let ts = now_secs();

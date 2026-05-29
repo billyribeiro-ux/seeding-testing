@@ -1,16 +1,24 @@
 //! multi-tenant-rls — the policy layer that builds the SQL for
 //! tenant-isolated, row-level-secured Postgres tables.
 //!
-//! The pattern (from `docs/01-architecture-decisions/0007-postgres-rls-tenant-isolation.md`):
+//! The mechanism is the one from
+//! `docs/01-architecture-decisions/0007-postgres-rls-tenant-isolation.md`:
 //!
-//!   1. Every tenant-scoped table has a `tenant_id UUID NOT NULL`.
+//!   1. Every tenant-scoped table carries a tenant key column.
 //!   2. The table has RLS enabled: `ALTER TABLE x ENABLE ROW LEVEL
 //!      SECURITY`.
 //!   3. A policy filters reads + writes by a session GUC the app sets
-//!      at the start of each request: `SET LOCAL app.tenant_id = '...'`.
+//!      at the start of each request transaction.
 //!   4. The app role is NOT a Postgres superuser — RLS bypass for
 //!      superusers is the whole reason migrations run as a separate
 //!      `app_migrator` role.
+//!
+//! Note on the key type: the MemberClub capstone (and ADR 0007) use an
+//! `org_id BIGINT` key with the `app.current_org_id` GUC. This lab uses a
+//! `tenant_id UUID` key with `app.tenant_id` on purpose — RLS is entirely
+//! key-type-agnostic, and showing both makes that explicit. The six SQL
+//! statements are identical; only the column name and the `::uuid` /
+//! `::bigint` cast differ.
 //!
 //! What this crate provides:
 //!

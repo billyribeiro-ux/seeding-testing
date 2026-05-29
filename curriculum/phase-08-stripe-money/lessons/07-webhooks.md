@@ -86,7 +86,9 @@ CREATE TABLE stripe_events (
 ```
 
 ```rust
-// Try to insert. If it conflicts, the event is a duplicate.
+// Try to insert. A conflict means we've *stored* this id before — but
+// "stored" is not "processed": a prior delivery may have crashed between
+// the insert and the UPDATE below.
 let inserted: Option<i64> = sqlx::query_scalar(
     "INSERT INTO stripe_events (stripe_event_id, event_type, created_at_stripe, payload)
      VALUES ($1, $2, $3, $4)
@@ -95,8 +97,20 @@ let inserted: Option<i64> = sqlx::query_scalar(
 ).bind(event.id).bind(event.type_str()).bind(event.created).bind(payload_json)
  .fetch_optional(&pool).await?;
 
-let Some(row_id) = inserted else {
-    return Ok(StatusCode::OK);  // already processed; ack the retry
+let row_id = match inserted {
+    Some(id) => id,                       // brand-new event
+    None => {
+        // Already stored. Resume it only if it was never finished;
+        // otherwise it's a true duplicate and we just ack.
+        let pending: Option<i64> = sqlx::query_scalar(
+            "SELECT id FROM stripe_events
+             WHERE stripe_event_id = $1 AND processed_at IS NULL"
+        ).bind(event.id).fetch_optional(&pool).await?;
+        match pending {
+            Some(id) => id,                          // resume a crashed attempt
+            None => return Ok(StatusCode::OK),       // already processed; ack
+        }
+    }
 };
 
 handle(event).await?;
@@ -109,11 +123,12 @@ Ok(StatusCode::OK)
 Three rules:
 
 1. **`INSERT ... ON CONFLICT DO NOTHING RETURNING id`** is the atomic
-   "insert if new" primitive. A second call returns `None`; only the first
-   call gets a row id.
+   "insert if new" primitive. A second delivery returns `None` — and then
+   `processed_at` is what decides: resume if it's still `NULL`, skip if it's
+   set. Dedup on *processed*, never on mere row existence.
 2. **Mark `processed_at` *after* the handler succeeds.** If we crash mid-handler,
-   the next delivery re-runs us — and that's *fine* because the handler is
-   itself idempotent (see "handler design" below).
+   `processed_at` stays `NULL`, so the next delivery re-runs us — and that's
+   *fine* because the handler is itself idempotent (see "handler design" below).
 3. **Always 200 a duplicate.** Stripe stops retrying on 200. Returning an
    error on duplicates causes endless retries.
 

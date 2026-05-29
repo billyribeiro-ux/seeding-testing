@@ -259,6 +259,27 @@ pub async fn store_event(
     Ok(row)
 }
 
+/// Look up an already-stored event that has **not** yet been marked
+/// processed, returning its row id (or `None` if it was fully processed).
+///
+/// This is what makes the receiver crash-safe. Storing the receipt row and
+/// running the side effect are two steps, and a crash can land between them.
+/// Because Stripe delivers at-least-once, the next delivery must *resume* an
+/// unprocessed row rather than treat it as a finished duplicate — otherwise
+/// the side effect is lost forever while Stripe sees a 200 and stops retrying.
+pub async fn pending_event_id(
+    pool: &SqlitePool,
+    stripe_event_id: &str,
+) -> Result<Option<i64>, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT id FROM stripe_events
+         WHERE stripe_event_id = ? AND processed_at IS NULL",
+    )
+    .bind(stripe_event_id)
+    .fetch_optional(pool)
+    .await
+}
+
 /// Mark the event processed.
 pub async fn mark_processed(pool: &SqlitePool, row_id: i64) -> Result<(), sqlx::Error> {
     sqlx::query(
@@ -281,18 +302,28 @@ async fn webhook(
     // 2. Parse just enough metadata.
     let meta = parse_event_meta(&body)?;
 
-    // 3. Idempotent insert.
-    let row = store_event(&s.pool, &meta, &body).await?;
-    let Some(row_id) = row else {
+    // 3. Idempotent insert. A fresh event gives us a new row id. A conflict
+    //    means we've stored this id before — but "stored" is not "processed":
+    //    a prior delivery may have crashed between the insert and step 5, so
+    //    we resume an unprocessed row instead of dropping the side effect.
+    let row_id = if let Some(id) = store_event(&s.pool, &meta, &body).await? {
+        id
+    } else if let Some(id) = pending_event_id(&s.pool, &meta.stripe_event_id).await? {
+        // Stored but never finished — a previous attempt crashed. Resume it.
+        id
+    } else {
+        // Already fully processed: ack the retry so Stripe stops resending.
         tracing::info!(event_id = %meta.stripe_event_id, "duplicate event ignored");
-        return Ok(StatusCode::OK); // ack the retry — Stripe stops resending
+        return Ok(StatusCode::OK);
     };
 
-    // 4. Handle the event. In real life this would dispatch by type;
-    //    here we just acknowledge — Phase 8 lessons cover the dispatching.
+    // 4. Handle the event. This MUST be idempotent: because step 5 runs after
+    //    it, a crash in between means the next delivery re-runs this handler.
+    //    In real life this dispatches by type; here we just acknowledge —
+    //    Phase 8 lessons cover the dispatching.
     tracing::info!(event_id = %meta.stripe_event_id, event_type = %meta.event_type, "processing");
 
-    // 5. Mark processed.
+    // 5. Mark processed — only now is the event considered done.
     mark_processed(&s.pool, row_id).await?;
 
     Ok(StatusCode::OK)

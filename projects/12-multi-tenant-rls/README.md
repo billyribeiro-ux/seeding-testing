@@ -14,6 +14,12 @@ The pattern (documented in ADR
   5. The app's Postgres role is NOT a superuser — superusers bypass
      RLS, so migrations run as a separate `app_migrator` role.
 
+> **Key type:** the MemberClub capstone and ADR 0007 use an `org_id BIGINT`
+> key (`app.current_org_id`). This lab uses a `tenant_id UUID` key
+> (`app.tenant_id`) deliberately — RLS is key-type-agnostic, and seeing
+> both makes that explicit. Only the column name and the `::uuid`/`::bigint`
+> cast differ; the six SQL statements are the same.
+
 ## What this crate provides
 
   * `TenantId` — newtype around `uuid::Uuid` so a function expecting
