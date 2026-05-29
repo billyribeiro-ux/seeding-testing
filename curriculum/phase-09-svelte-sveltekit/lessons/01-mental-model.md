@@ -35,9 +35,9 @@ We use **SSR** for MemberClub — the user's session is on the server, so the fi
 
 The default form in SvelteKit is just `<form method="POST" action="?/create">`. It works **without JavaScript** — the browser submits the form, the server handles it, returns HTML.
 
-When JavaScript loads, SvelteKit *enhances* the form: submissions become fetches; the page doesn't full-reload; you get optimistic UI for free.
+To get the no-reload experience you *opt in* with the `use:enhance` action (from `$app/forms`): submissions become `fetch`es, the page doesn't full-reload, and you can layer optimistic UI on top. SvelteKit does **not** enhance forms automatically — but the same server action handles both the plain and enhanced cases.
 
-You don't have to write either path explicitly. Write the form, get both.
+Write the action once; the form works without JS by default and upgrades the moment you add `use:enhance`.
 
 ## The folder layout
 
@@ -78,7 +78,7 @@ Folder names are URL segments. `[slug]` is a dynamic param. `[...rest]` catches 
 
 - **The file-name conventions are *the* SvelteKit API.** You don't import a router — you put files in folders.
 - **Server / client separation is enforced by the compiler.** Mistakes turn into build errors, not runtime XSS.
-- **Progressive enhancement is the *default*.** Other frameworks require you to opt in; SvelteKit gives it to you for free.
+- **Forms work without JavaScript by default**, and progressive enhancement is one `use:enhance` away — the same action serves both paths, with no server code changes.
 
 ## Green-bar checkpoint
 

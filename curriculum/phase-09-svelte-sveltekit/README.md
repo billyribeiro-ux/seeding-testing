@@ -10,7 +10,7 @@
 
 Two grand principles:
 
-1. **Server-side rendering by default.** Every route renders on the server first (so HTML is the source of truth) and *progressively enhances* with JavaScript. Forms work without JS; runes light up when JS arrives.
+1. **Server-side rendering by default.** Every route renders on the server first (so HTML is the source of truth), then hydrates so runes light up when JS arrives. Forms work without JS out of the box, and you opt into the no-reload `fetch` path per-form with `use:enhance`.
 2. **`$lib/server/` is the privacy fence.** Anything imported from there cannot reach the browser bundle. The compiler refuses.
 
 Add a third for our stack:

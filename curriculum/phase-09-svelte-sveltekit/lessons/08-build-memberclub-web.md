@@ -58,11 +58,13 @@ A user clicks "Add" on `/notes`:
 5. SvelteKit re-runs /notes/+page.server.ts's `load`:
      - fetches the user's notes (now including the new one)
 6. The response is the updated /notes page HTML.
-7. SvelteKit's enhanced form merges the new HTML into the DOM.
+7. The browser renders it — a full page navigation.
 ```
 
-Without JS, step 7 is a full page reload. With JS it's a fetch + DOM
-patch. Both produce identical user-visible output.
+These forms are plain `<form method="POST">` with no `use:enhance`, so
+step 7 is always a full page reload (and it works with JS disabled). Add
+`use:enhance` to a form and that same round-trip happens over `fetch` with
+an in-place DOM patch instead — the server code is identical either way.
 
 ## Three patterns to memorize
 
@@ -161,8 +163,9 @@ identical.
   actions for mutations, `$lib/server` for secrets.
 - **Auth on the server, never the client.** The browser never sees the
   password hash or the session lookup logic.
-- **Progressive enhancement is free.** Every form works without JS;
-  enhances when JS arrives.
+- **Progressive enhancement is one opt-in away.** Every form here works
+  without JS today; add `use:enhance` and it upgrades to a no-reload fetch
+  without changing the server action.
 
 Phase 9 is complete. Phase 10 — **Observability** — instruments
 everything we've built.
