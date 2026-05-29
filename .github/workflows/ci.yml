@@ -124,7 +124,10 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check
-          arguments: --all-features
+          # The action defaults `arguments` to `--all-features`, which is not a
+          # valid flag for `cargo deny check`. Feature handling lives in
+          # deny.toml (`[graph] all-features = true`), so pass no extra args.
+          arguments: ""
 
   audit:
     name: cargo-audit

@@ -1,0 +1,14 @@
+# cargo-audit configuration (read by `cargo audit` and the CI audit job).
+# Keep this in sync with the `[advisories] ignore` list in deny.toml.
+
+[advisories]
+ignore = [
+    # rsa 0.9 — RUSTSEC-2023-0071 (Marvin attack: non-constant-time RSA leaks
+    # private-key bits via decryption timing observable over the network).
+    # No fixed release exists yet (RustCrypto/RSA#626). It reaches us via the
+    # RS256 JWT lab (auth-demo) and transitively via totp-rs, and is used only
+    # for JWT sign/verify + TOTP, never as a network decryption oracle — so the
+    # practical exposure is low. Drop once a constant-time rsa release ships.
+    # Revisit by 2026-09-01. Rationale mirrored in deny.toml.
+    "RUSTSEC-2023-0071",
+]
