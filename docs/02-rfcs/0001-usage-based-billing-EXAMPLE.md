@@ -70,7 +70,7 @@ CREATE TABLE usage_periods (
     period_end      TIMESTAMPTZ NOT NULL,
     peak_bytes      BIGINT NOT NULL DEFAULT 0,
     overage_bytes   BIGINT NOT NULL DEFAULT 0,
-    overage_cents   BIGINT NOT NULL CHECK (overage_cents >= 0 AND overage_cents < 2_100_000_000_00),
+    overage_cents   BIGINT NOT NULL CHECK (overage_cents >= 0 AND overage_cents < 2100000000000),
     stripe_invoice_id TEXT,
     UNIQUE (customer_id, period_start, period_end)
 );

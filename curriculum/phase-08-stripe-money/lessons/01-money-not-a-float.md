@@ -69,7 +69,7 @@ This is the "decimal for arithmetic, integer for state" pattern.
 ## The $21 billion ceiling
 
 ```rust
-pub const MONEY_CEILING_CENTS: i64 = 2_100_000_000_00;   // $21,000,000,000.00
+pub const MONEY_CEILING_CENTS: i64 = 2_100_000_000_000;   // $21,000,000,000.00
 ```
 
 Why $21B?

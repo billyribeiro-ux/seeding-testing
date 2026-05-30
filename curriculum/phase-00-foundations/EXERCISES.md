@@ -127,7 +127,7 @@ Deliberately break something to *experience* a failing CI run:
 1. In `README.md`, introduce a malformed table (e.g. delete a `|` so the markdown renders weirdly).
 2. Commit and push.
 3. `gh run watch` — confirm the run is green (markdown isn't checked in CI yet).
-4. Now break Rust code: in `Cargo.toml`, change `clap = { version = "4.5", features = ["derive"] }` to `clap = { version = "4.5", features = ["nope"] }`.
+4. Now break Rust code: in the workspace root `Cargo.toml`, under `[workspace.dependencies]`, change `clap = { version = "4.6", features = ["derive"] }` to `clap = { version = "4.6", features = ["nope"] }`.
 5. Commit and push. Watch CI go red. Click the failed job's URL and identify *which sub-step* failed.
 6. Fix it. Push. Watch it go green.
 

@@ -29,7 +29,7 @@ Or `make verify` from the repo root.
 | File | Purpose |
 |---|---|
 | `src/lib.rs` | `Money`, `Currency`, `MoneyError`, arithmetic, split, Display |
-| `src/lib.rs` (tests) | 18 unit tests + 6 property tests |
+| `src/lib.rs` (tests) | 21 unit tests + 8 property tests |
 
 ## What's deliberately not here
 

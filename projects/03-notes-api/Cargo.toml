@@ -4,6 +4,7 @@ version     = { workspace = true }
 edition     = { workspace = true }
 rust-version = { workspace = true }
 license     = { workspace = true }
+publish     = false   # curriculum application, never published to crates.io
 description = "Phase 4 capstone — a real Axum CRUD service over the sqlx-notes data layer. Demonstrates routing, extractors, problem-details errors, and middleware."
 
 [[bin]]

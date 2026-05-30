@@ -1,6 +1,6 @@
-# Lesson 8.3 — Proportional Split with Banker's Rounding
+# Lesson 8.3 — Proportional Split with the Largest-Remainder Method
 
-> **Concept first:** "split this invoice three ways equally" sounds simple. It is not. The split must sum exactly to the original — to the cent. Banker's rounding plus a fix-up step is the only way.
+> **Concept first:** "split this invoice three ways equally" sounds simple. It is not. The split must sum exactly to the original — to the cent. Flooring each share and then distributing the leftover cents to the largest remainders is the only way.
 > **Time:** 25 minutes.
 
 ## The problem
@@ -133,8 +133,8 @@ the corner cases.
 
 - **A single-cent rounding error in a single transaction is a tiny bug.**
   Repeated 10,000,000 times a year, it's $100,000 missing from your ledger.
-- **Banker's rounding without the residue fix-up is *still wrong*.** Sums
-  drift. The largest-remainder method is the cure.
+- **Rounding each share independently is *still wrong*.** Sums drift. Only
+  the largest-remainder residue fix-up guarantees the parts add back up.
 - **Property tests are the only way to catch this safely.** Manual examples
   can't enumerate the space.
 

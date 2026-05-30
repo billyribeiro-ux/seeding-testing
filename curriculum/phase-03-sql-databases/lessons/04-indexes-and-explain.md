@@ -7,7 +7,7 @@
 
 Without an index, the DB has to do a *sequential scan* — read every row to check if it matches. That's `O(n)`. For a million-row table that's a million row-touches per query, and your `WHERE email = 'alice@b.com'` will be very slow.
 
-With an index on `email`, the DB consults a *B-tree* (binary-tree-shaped lookup structure) and arrives at the row in `O(log n)`. For a million rows, that's ~20 hops. Microseconds.
+With an index on `email`, the DB consults a *B-tree* (a balanced, multi-way tree — each node holds many keys, not just two) and arrives at the row in `O(log n)`. For a million rows, that's a handful of hops. Microseconds.
 
 The cost: every `INSERT`/`UPDATE`/`DELETE` to the table must also update the index. Writes get slightly slower; reads get massively faster.
 

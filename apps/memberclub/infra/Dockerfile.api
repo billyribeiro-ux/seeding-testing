@@ -16,11 +16,13 @@ RUN apt-get update \
 
 WORKDIR /work
 
-# Copy the whole workspace. We do it in two passes so dep compilation is
-# cached: first the manifests, then the sources.
+# Copy the whole workspace. Every workspace member listed in the root
+# Cargo.toml must be present (including xtask) or cargo can't resolve the
+# workspace, even when building a single binary.
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY projects/ ./projects/
 COPY apps/ ./apps/
+COPY xtask/ ./xtask/
 
 # Build only the binary we ship.
 RUN cargo build --release --bin memberclub-api

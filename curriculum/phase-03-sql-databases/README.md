@@ -23,7 +23,7 @@ We do this phase in two passes — deliberately. *Why?* Because the lowest-frict
 | Database | SQLite (file, no server) | PostgreSQL 17 (Docker container) |
 | Toolkit | Drizzle ORM (TypeScript) | sqlx (Rust, compile-time-checked SQL) |
 | App | SvelteKit `projects/02b-sqlite-notes-svelte` | Rust `projects/02c-sqlx-notes` |
-| What you write | `db.select().from(notes)` | `sqlx::query_as!(Note, "SELECT … FROM notes WHERE …")` |
+| What you write | `db.select().from(notes)` | `sqlx::query_as::<_, Note>("SELECT … FROM notes WHERE …")` (the runtime form, so the project builds without a live DB; the capstone uses the compile-time `query_as!` macro against Postgres) |
 | What ships in MemberClub | — | **This** is the production stack |
 
 The side-by-side teaches you to read both flavours fluently. Most senior engineers can.
@@ -46,7 +46,7 @@ The side-by-side teaches you to read both flavours fluently. Most senior enginee
 ## Capstone drills
 
 - **`projects/02b-sqlite-notes-svelte/`** — A tiny SvelteKit app: a single page that lists, adds, and deletes notes. Drizzle schema, `drizzle-kit push`, server-only DB access via `$lib/server`.
-- **`projects/02c-sqlx-notes/`** — A Rust library + integration tests. Hand-written SQL, sqlx migrations, `query_as!` with compile-time checking, transactions.
+- **`projects/02c-sqlx-notes/`** — A Rust library + integration tests. Hand-written SQL, sqlx migrations, runtime `query_as::<_, Note>` (so it builds with no live DB), typed errors. The compile-time `query_as!` macro arrives with Postgres in Phase 4.
 
 Both projects ship clippy/lint-clean with green tests.
 

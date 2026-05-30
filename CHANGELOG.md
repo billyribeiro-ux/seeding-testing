@@ -6,9 +6,64 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-Items being worked on but not yet shipped:
+### Added — post-0.1.0 expansion
 
-- (none currently)
+- **Eight more projects:** `08-outbox-demo` (transactional outbox),
+  `10-memberclub-cli`, `11-redis-cache` (cache + single-flight + rate
+  limit), `12-multi-tenant-rls`, `13-load-test`, `14-sagas` (orchestrator
+  + compensation), `15-capacity-planner`, `16-event-sourcing` (ES + CQRS),
+  plus the `apps/memberclub/api` Axum + Postgres service.
+- **Auth surface grew** (`04-auth-demo`): OAuth, magic-link, email
+  verification, password reset, RS256 JWT lab, refresh-token rotation —
+  now 80+ tests.
+- **Docs deep-dive series:** `async-internals`, `database-internals`
+  (MVCC / WAL / VACUUM), `distributed-systems` (CAP/PACELC, consensus,
+  sagas-vs-2PC, failure modes, event-sourcing/CQRS), `security` (STRIDE,
+  OWASP, supply-chain, transport headers), `compliance` (GDPR/SOC2/HIPAA/
+  PII), `leadership` (vision, hiring, OSS, conference talk). Four more
+  runbooks (db-connection-storms, deploy-failure, disaster-recovery,
+  rollback) and three more mental-models (computer, auth, rbac-vs-abac).
+  Grafana dashboard JSON under `docs/observability/`.
+
+### Fixed — principal-level review pass
+
+- **Money ceiling was 10× too small in the docs.** Every doc/lesson copy
+  of the "$21B" ceiling used `210_000_000_000` / `2_100_000_000_00`
+  (= $2.1B). Corrected to `2_100_000_000_000` cents ($21B) across
+  PLAYBOOK, the money mental-model, ADR 0003, the RFC example, and several
+  lessons/migrations/tests. (The `stripe-money-lab` source constant was
+  already correct; SQL `CHECK` literals normalized to plain digits.)
+- **auth-demo user-enumeration timing leak.** The unknown-email sentinel
+  hash used heavier argon2 params than `Argon2::default()`, making the
+  defense path *slower* than a real verify. Sentinel regenerated with
+  default params + a regression test asserting they match.
+- **notes-api `/metrics` non-determinism.** A process-global Prometheus
+  recorder meant only the first `AppState` rendered metrics; later ones
+  (e.g. a second test in the same `cargo test` process) rendered an empty
+  registry. The render handle is now cached in a `OnceLock`, so `/metrics`
+  is deterministic under both `cargo test` and `cargo nextest`.
+- **CD pipeline pointed at non-existent paths.** Fixed Dockerfile paths
+  (`infra/Dockerfile.{api,web}`), the web build context, the migration
+  source (`api/migrations`), gated the fly.io deploy jobs, and made
+  `Dockerfile.api` copy the `xtask` workspace member (the in-image
+  `cargo build` could not resolve the workspace without it).
+- **CI** now runs `projects/09-svelte-counter` in the web test matrix.
+- **Lesson technical-accuracy fixes**, e.g.: Axum 0.8 `Next` is
+  non-generic; there is no `Headers` extractor; NLL landed in the 2018
+  edition; a B-tree is not a binary tree; sqlx `last_insert_id` is not a
+  Postgres concept and `RETURNING` dates to 8.2; the `query_as!` macro
+  maps by position (the `02c` project uses the runtime form); `Argon2::
+  default()` is m=19456/t=2/p=1; TOTP secrets are 20 bytes; HttpOnly
+  prevents token *exfiltration* but does not neutralize XSS; SvelteKit
+  forms are **not** auto-enhanced (`use:enhance` is opt-in); the
+  proportional split is largest-remainder, not banker's rounding; the
+  Redis limiter is a fixed-window counter, not a token bucket; GDPR
+  erasure-vs-retention is Art. 17(3)(b); RLS `set_config` must be scoped
+  to a transaction; plus assorted capacity-math, off-by-one, and stale
+  count/cross-reference corrections.
+- **README/CHANGELOG counts refreshed** to the current scope (110
+  lessons, 18 workspace members, 16 Rust projects + 2 SvelteKit + the
+  memberclub capstone).
 
 ## [0.1.0] — 2026-05-26
 

@@ -25,12 +25,14 @@ apps/memberclub/api/
 ├── Cargo.toml
 ├── README.md
 ├── migrations/
-│   └── 20260526170000_init.sql        users + sessions + notes + audit_logs
+│   ├── 20260526170000_init.sql        users + sessions + notes + audit_logs
+│   └── 20260527000000_billing.sql     stripe_customers + subscriptions + invoices + events
 └── src/
     ├── main.rs                        binary: tracing + bind + graceful shutdown
     ├── lib.rs                         Router, AppState, ApiError, /healthz, /metrics
     ├── auth.rs                        password / sessions / JWT / extractor
     ├── notes.rs                       DB ops + policy-gated handlers
+    ├── billing.rs                     Stripe checkout/portal + signed webhook receiver
     └── policy.rs                      Forbidden + can_* predicates + require!
 ```
 
@@ -49,6 +51,9 @@ apps/memberclub/api/
 | GET    | `/v1/notes/{id}`      | yes  | gated by `can_read_doc` |
 | PATCH  | `/v1/notes/{id}`      | yes  | gated by `can_write_doc` |
 | DELETE | `/v1/notes/{id}`      | yes  | gated by `can_delete_doc` |
+| POST   | `/v1/billing/checkout`| yes  | validates price_id, mints Stripe customer, returns Checkout URL |
+| POST   | `/v1/billing/portal`  | yes  | returns Customer Portal URL |
+| POST   | `/webhooks/stripe`    | sig  | HMAC-SHA-256 signature + idempotent event mirror |
 
 ## Scope cuts vs. the source projects
 

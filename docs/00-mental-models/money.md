@@ -25,7 +25,7 @@ In SQL: `BIGINT NOT NULL`. Never `NUMERIC`. Never `FLOAT` / `DOUBLE`.
 ### 2. The $21B ceiling
 
 ```rust
-pub const MONEY_CEILING_CENTS: i64 = 210_000_000_000; // $21,000,000,000.00
+pub const MONEY_CEILING_CENTS: i64 = 2_100_000_000_000; // $21,000,000,000.00 (2.1 trillion cents)
 ```
 
 Bounds every value. The constructor (`Money::new`) refuses values whose

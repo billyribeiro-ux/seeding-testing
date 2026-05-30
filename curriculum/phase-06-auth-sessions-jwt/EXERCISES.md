@@ -115,10 +115,10 @@ tx.commit().await?;
 
 ## E6.4 — Add TOTP 2FA (Medium) — shipped
 
-Reference implementation: `projects/04-auth-demo/src/totp.rs` wires the `totp-rs` crate and exposes `POST /auth/totp/enroll` (returns the otpauth provisioning URI plus 10 single-use recovery codes, hashed at rest), `POST /auth/totp/verify` (confirms enrollment by validating a code against the pending secret), and the login flow's second-step branch. Integration tests in `projects/04-auth-demo/tests/totp.rs` cover enrollment, verification, recovery-code single-use, and the login-with-2FA path.
+Reference implementation: `projects/04-auth-demo/src/totp.rs` wires the `totp-rs` crate and exposes `POST /auth/totp/enroll` (returns the otpauth provisioning URI plus 8 single-use recovery codes, hashed at rest), `POST /auth/totp/confirm` (confirms enrollment by validating a code against the pending secret), and the login flow's second-step branch. Integration tests in `projects/04-auth-demo/tests/totp.rs` cover enrollment, verification, recovery-code single-use, and the login-with-2FA path.
 
 Add `totp-rs` dep. Endpoints: `POST /auth/totp/enroll` (returns provisioning URI
-and 10 recovery codes), `POST /auth/totp/verify` (confirms enrollment), and
+and 8 recovery codes), `POST /auth/totp/confirm` (confirms enrollment), and
 modify `POST /auth/login` to require a second step when 2FA is enabled.
 
 ---

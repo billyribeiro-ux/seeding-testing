@@ -50,7 +50,6 @@ Behind the scenes, sqlx connects to your DB at *compile time*, runs `PREPARE`, a
 ## `query_as!` — into your own type
 
 ```rust
-#[derive(sqlx::FromRow)]
 struct User {
     id: i64,
     email: String,
@@ -68,6 +67,8 @@ let user = sqlx::query_as!(
 
 Same checks, but the result is your `User`. We prefer `query_as!` for return values that flow further than one function.
 
+Note the `query_as!` *macro* assigns columns to fields **by position**, in `SELECT` order — it does not require (or use) a `#[derive(sqlx::FromRow)]`. That derive is for the *runtime* form `query_as::<_, User>(...)` (the one `projects/02c-sqlx-notes` uses), which maps by column name instead.
+
 ## Fetch modes
 
 | Method | Returns | Use when |
@@ -75,7 +76,7 @@ Same checks, but the result is your `User`. We prefer `query_as!` for return val
 | `.fetch_all(&pool)`     | `Vec<Row>` | You want everything |
 | `.fetch_one(&pool)`     | `Row` (errors if 0 or >1) | You expect exactly one (e.g. by PK) |
 | `.fetch_optional(&pool)`| `Option<Row>` (errors only if >1) | You expect zero or one |
-| `.execute(&pool)`       | `QueryResult` (rows_affected, last_insert_id) | INSERT / UPDATE / DELETE |
+| `.execute(&pool)`       | `QueryResult` (`rows_affected()`; `last_insert_rowid()` on SQLite — Postgres has no auto-id here, use `RETURNING`) | INSERT / UPDATE / DELETE |
 | `.fetch(&pool)`         | A `Stream<Item = Row>` | Large result sets — read row by row |
 
 ## Transactions
@@ -149,7 +150,7 @@ For the curriculum's hard-evidence project we use `sqlx::SqlitePool` with an in-
 | `$1` placeholders | `?` placeholders |
 | `BIGINT GENERATED ALWAYS AS IDENTITY` | `INTEGER PRIMARY KEY AUTOINCREMENT` |
 | `TIMESTAMPTZ`, `now()` | `TEXT`, `strftime('%Y-%m-%dT%H:%M:%fZ','now')` |
-| `RETURNING *` (since v10) | `RETURNING *` (since v3.35) |
+| `RETURNING *` (since v8.2) | `RETURNING *` (since v3.35) |
 
 Everything else is the same.
 

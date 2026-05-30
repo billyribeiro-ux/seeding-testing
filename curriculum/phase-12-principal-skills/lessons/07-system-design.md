@@ -87,7 +87,7 @@ Sketch:
 10000 RPS × 1 KB payload = 10 MB/s egress
 10000 RPS × 0.1 ms CPU = 1 vCPU minimum (×3 for headroom)
 Cache hit ratio target: 90% (1000 RPS to DB)
-DB QPS budget: 1000; conn pool 50 × 8 pods = 400 conns; each at ~25ms = 16 QPS each
+DB QPS budget: 1000; conn pool 50 × 8 pods = 400 conns; each at ~25ms = 40 QPS each → ~16k QPS ceiling, 16× the budget
 ```
 
 If the math doesn't close, the design doesn't work. Find the constraint

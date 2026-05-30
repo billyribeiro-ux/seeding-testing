@@ -245,7 +245,11 @@ that fails with SQLSTATE 40001.
 
 ## The `FOR UPDATE SKIP LOCKED` pattern
 
-`projects/08-outbox-demo` uses this pattern in its worker
+`projects/08-outbox-demo` runs on SQLite (whose serialized writes make
+its `UPDATE ... WHERE id = (SELECT ... LIMIT 1) RETURNING` claim
+naturally single-flight), but its docstring and the README call out the
+Postgres production form — the one you reach for the moment you want
+*parallel* workers
 ([`projects/08-outbox-demo/src/lib.rs`](../../projects/08-outbox-demo/src/lib.rs)):
 
 ```sql
@@ -269,7 +273,7 @@ rows with zero coordination beyond what the database itself provides. This
 is essentially "we opted into serializability for these specific rows
 without paying for it on the rest of the table." It works because each
 worker takes its lock, does its work (publish the event, update the row to
-`status = 'sent'`), and commits — the lock is held only for the duration
+`status = 'done'`), and commits — the lock is held only for the duration
 of the transaction.
 
 The non-MVCC alternative — `SELECT WHERE status = 'pending' LIMIT 100`

@@ -108,7 +108,9 @@ For the `load` profile, **wrap inserts in batches** of ~1000 rows per transactio
 let mut tx = pool.begin().await?;
 for (i, row) in rows.enumerate() {
     sqlx::query!(...).execute(&mut *tx).await?;
-    if i % 1000 == 0 { tx.commit().await?; tx = pool.begin().await?; }
+    // Commit every 1000th row. `i + 1` so the boundary lands after a
+    // full batch, not after the first row (`i == 0`).
+    if (i + 1) % 1000 == 0 { tx.commit().await?; tx = pool.begin().await?; }
 }
 tx.commit().await?;
 ```

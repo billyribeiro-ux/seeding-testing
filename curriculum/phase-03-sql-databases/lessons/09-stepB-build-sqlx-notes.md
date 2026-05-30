@@ -9,7 +9,7 @@
 
 - A migration that creates the `notes` table with a CHECK constraint.
 - Functions `list`, `add`, `delete`, `get` over a `SqlitePool`.
-- 12 integration tests against an in-memory SQLite database.
+- Integration tests against an in-memory SQLite database — 12 to start, growing to 21 as later-phase exercises (E3.6, plus the Phase 4/5 keyset and factory drills) add `update`, `list_keyset`, and the test-data factory.
 - A `NotesError` enum with `thiserror`.
 
 No binary, no HTTP — that comes in Phase 4. This phase is about the *data layer*.
@@ -27,6 +27,7 @@ migrations/
   20260526120000_create_notes.sql
 src/
   lib.rs
+  factory.rs        # test-data builder, added by the Phase 5 drill
 tests/
   notes.rs
 ```
@@ -141,7 +142,7 @@ Two non-obvious moves:
 1. **`max_connections(1)`** — `sqlite::memory:` creates a *new* database per connection. With multiple connections, half your queries would see an empty DB. One connection = one shared DB inside the test.
 2. **`migrate(&pool).await`** — calls our library's `migrate` function which runs `sqlx::migrate!("./migrations")` internally. The schema is bootstrapped exactly as it is in production.
 
-Twelve tests:
+The twelve tests we build in this lesson (later exercises add nine more — `update`, `list_keyset`, and factory tests — for 21 total):
 
 ```rust
 #[tokio::test] async fn list_is_empty_initially()              { ... }
@@ -163,7 +164,7 @@ The last one is the *belt-and-braces* test — it issues a raw SQL `INSERT` with
 ## Step 5 — Run it
 
 ```bash
-cargo test -p sqlx-notes                  # 12/12 green
+cargo test -p sqlx-notes                  # all green (21/21 once the later drills are in)
 cargo clippy -p sqlx-notes -- -D warnings # clean
 cargo fmt -p sqlx-notes -- --check        # clean
 make verify                               # whole workspace green
@@ -194,7 +195,7 @@ Two different aesthetics, same outcome. Drizzle wins on terseness; sqlx wins on 
 
 ## Green-bar checkpoint
 
-- `cargo test -p sqlx-notes` shows `12 passed`.
+- `cargo test -p sqlx-notes` is green (`21 passed` with the later drills in; 12 if you stop at this lesson).
 - You can explain why a `max_connections(1)` SQLite pool is required for `:memory:`.
 - You can read the Drizzle and sqlx versions of `listNotes` and explain the trade.
 

@@ -91,7 +91,7 @@ async fn db_check_constraint_rejects_overflow() {
     // Belt-and-braces: the DB-layer CHECK constraint catches anything past
     // the $21B ceiling even if application validation is bypassed.
     let p = pool().await;
-    let err = record_transfer(&p, "alice", "bob", 2_100_000_000_00).await;
+    let err = record_transfer(&p, "alice", "bob", 2_100_000_000_000).await;
     assert!(err.is_err());
 }
 

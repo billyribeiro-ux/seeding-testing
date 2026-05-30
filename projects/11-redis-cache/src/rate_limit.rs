@@ -1,15 +1,24 @@
-//! Token-bucket rate limiter, KV-backed.
+//! Fixed-window counter rate limiter, KV-backed.
 //!
 //! Algorithm: every key has a counter incremented per request. On the
 //! first increment of a fresh window, the TTL is set to the window
-//! length — the counter dies on its own and refills at the next
-//! request after the window. Returns `Allowed { remaining }` on
-//! success or `Limited { retry_after }` once the budget is spent.
+//! length — the counter dies on its own and the window resets at the
+//! next request after the TTL elapses. Returns `Allowed { remaining }`
+//! on success or `Limited { retry_after }` once the budget is spent.
 //!
-//! This is the same shape Lesson 6.7 ("Rate Limiting and Account
-//! Lockout") names — and it's how Redis-backed rate limiters are
-//! conventionally implemented. The trait lets the same code run
-//! against Redis in production and `InMemoryBackend` in tests.
+//! (This is the fixed-window counter, not a token bucket: tokens do not
+//! refill continuously, so a caller can fire up to `2 × max_requests`
+//! across a window boundary. That burst tolerance is acceptable for the
+//! login/abuse-control use here; a true token or leaky bucket is the
+//! upgrade when you need smooth pacing.)
+//!
+//! Lesson 6.7 ("Rate Limiting and Account Lockout") reaches for
+//! `tower-governor` (a GCRA / token-bucket-family limiter) for the
+//! per-IP login case; this module is the simpler distributed-friendly
+//! cousin — a counter + TTL is the canonical Redis-backed shape because
+//! `INCR` + first-call `EXPIRE` is a two-command, lock-free recipe. The
+//! trait lets the same code run against Redis in production and
+//! `InMemoryBackend` in tests.
 
 use std::time::Duration;
 

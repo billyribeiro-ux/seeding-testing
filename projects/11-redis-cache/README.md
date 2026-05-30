@@ -5,8 +5,8 @@ Phase 11 caching lab. Two patterns from the lessons:
   * **Single-flight `get_or_compute`** — many concurrent callers ask
     for the same key; only one runs the compute; the rest wait. Stops
     thundering-herd hammering of slow upstreams.
-  * **Token-bucket rate limiter** — N per window per key, atomic
-    `INCR` + first-call-only TTL.
+  * **Fixed-window counter rate limiter** — at most N per window per
+    key, atomic `INCR` + first-call-only TTL.
 
 Both are written against a `CacheBackend` trait. The provided
 `InMemoryBackend` powers the tests and runs in a single-process

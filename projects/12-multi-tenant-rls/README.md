@@ -3,7 +3,7 @@
 Phase 11 lab — multi-tenant Postgres with row-level security.
 
 The pattern (documented in ADR
-`docs/01-architecture-decisions/0007-postgres-row-level-security.md`):
+`docs/01-architecture-decisions/0007-postgres-rls-tenant-isolation.md`):
 
   1. Every tenant-scoped table has `tenant_id UUID NOT NULL`.
   2. `ALTER TABLE x ENABLE ROW LEVEL SECURITY;`
@@ -13,6 +13,12 @@ The pattern (documented in ADR
      the top of each request transaction.
   5. The app's Postgres role is NOT a superuser — superusers bypass
      RLS, so migrations run as a separate `app_migrator` role.
+
+> **Key type:** the MemberClub capstone and ADR 0007 use an `org_id BIGINT`
+> key (`app.current_org_id`). This lab uses a `tenant_id UUID` key
+> (`app.tenant_id`) deliberately — RLS is key-type-agnostic, and seeing
+> both makes that explicit. Only the column name and the `::uuid`/`::bigint`
+> cast differ; the six SQL statements are the same.
 
 ## What this crate provides
 

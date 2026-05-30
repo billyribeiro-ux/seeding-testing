@@ -7,8 +7,12 @@ use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, Salt
 use argon2::{Argon2, password_hash::rand_core::OsRng};
 
 /// A fixed sentinel hash used to keep the login response time constant when the
-/// user doesn't exist. Computed once at first use.
-pub static SENTINEL_HASH: &str = "$argon2id$v=19$m=65536,t=3,p=4$ZGV2c2VudGluZWxzYWx0$M+pq1Mhgw3qfb8MK1pSwfn9k0NLm6/MhAJjvgMTcUjk";
+/// user doesn't exist: the unknown-email path verifies against this so it does
+/// the *same* argon2 work as a real verify. Its parameters MUST therefore match
+/// what [`hash`] produces (`Argon2::default()` → m=19456, t=2, p=1); otherwise
+/// the unknown-email path would take measurably different time and re-open the
+/// enumeration timing channel it exists to close.
+pub static SENTINEL_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$ZGV2c2VudGluZWxzYWx0$stKOA/bBqGK3fX6EOojIN+BC+sT8SFit385JtMsjgqc";
 
 pub fn hash(plain: &str) -> Result<String, argon2::password_hash::Error> {
     let salt = SaltString::generate(&mut OsRng);
@@ -40,6 +44,23 @@ mod tests {
     #[test]
     fn rejects_garbage_hash() {
         assert!(!verify("anything", "not a real argon2 hash"));
+    }
+
+    #[test]
+    fn sentinel_parses_and_matches_default_params() {
+        // The sentinel must be a valid PHC string (so the unknown-email path
+        // actually runs argon2) and its parameters must equal what `hash`
+        // produces — otherwise the constant-time defense is defeated by a
+        // parameter-driven timing difference between the two paths.
+        let parsed = PasswordHash::new(SENTINEL_HASH).expect("sentinel must be valid PHC");
+        let from_hash = hash("whatever").unwrap();
+        let real = PasswordHash::new(&from_hash).unwrap();
+        assert_eq!(
+            parsed.params, real.params,
+            "sentinel params must match Argon2::default() so timing stays constant"
+        );
+        // A user-supplied password must not verify against the sentinel.
+        assert!(!verify("correct horse battery staple", SENTINEL_HASH));
     }
 
     #[test]

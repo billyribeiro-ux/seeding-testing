@@ -77,7 +77,7 @@ println!("{r3:?}");                            // ❌ shared refs still in scope
 
 The compiler will tell you exactly which line conflicts with which.
 
-> **In Rust 2021+ the rule is "non-lexical lifetimes":** a reference's lifetime ends at its *last use*, not the end of the enclosing block. So this works:
+> **Since the 2018 edition, the rule is "non-lexical lifetimes" (NLL):** a reference's lifetime ends at its *last use*, not the end of the enclosing block. So this works:
 >
 > ```rust
 > let mut v = vec![1, 2, 3];

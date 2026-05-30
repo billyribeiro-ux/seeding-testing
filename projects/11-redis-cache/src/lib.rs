@@ -7,9 +7,10 @@
 //!      the rest wait for it. Stops "stampede" — a thundering herd
 //!      hammering a slow upstream when a hot cache entry expires.
 //!
-//!   2. **Token-bucket rate limiter** — N tokens per window per key,
-//!      refilling at a fixed rate. Postgres + Redis both implement
-//!      this; here we keep the policy logic agnostic and store via a
+//!   2. **Fixed-window counter rate limiter** — at most N requests per
+//!      window per key, the counter expiring with the window. Postgres
+//!      + Redis both implement this; here we keep the policy logic
+//!      agnostic and store via a
 //!      `CacheBackend` trait so the same code runs against an
 //!      in-memory map in tests and Redis (or any KV) in production.
 //!

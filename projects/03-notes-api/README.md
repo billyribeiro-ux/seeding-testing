@@ -44,7 +44,7 @@ Or `make verify` from the repo root.
 | Method | Path | Response |
 |---|---|---|
 | GET | `/healthz` | `200 {"status":"ok","version":"..."}` |
-| GET | `/v1/notes?limit=N` | `200 [Note...]` |
+| GET | `/v1/notes?limit=N&cursor=...` | `200 {"items":[Note...],"next":"cursor-or-null"}` |
 | POST | `/v1/notes` | `201 Note` or `400` problem-details |
 | GET | `/v1/notes/:id` | `200 Note` or `404` problem-details |
 | PATCH | `/v1/notes/:id` | `200 Note` or `400`/`404` |

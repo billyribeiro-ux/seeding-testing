@@ -14,10 +14,10 @@ This repo *is* the textbook. Read top-down, code along, run `make verify` at the
 ## Status: complete
 
 - **13 phases** authored (Phase 0 + Phases 1–12).
-- **92 lessons** across the curriculum.
-- **10 projects shipped**, fully built and tested.
-- **148 tests green** (136 Rust + 12 vitest).
-- **8 ADRs**, 2 runbooks, 3 mental-model essays, 3 templates (ADR, RFC, postmortem) in `docs/`.
+- **110 lessons** across the curriculum.
+- **16 standalone Rust projects + 2 SvelteKit warm-ups**, plus the full-stack `apps/memberclub` capstone (Rust API + SvelteKit web) — all built and tested.
+- **345 Rust test functions across 17 crates + 18 vitest across 3 SvelteKit suites.** CI runs the full suite against Postgres 17 + Redis; `make verify` (fmt + clippy `-D warnings` + tests) is the gate.
+- **8 ADRs**, 6 runbooks, 6 mental-model essays, 3 templates (ADR, RFC, postmortem), plus deep-dive series under `docs/` (async-internals, database-internals, distributed-systems, security, compliance, leadership, perf, observability).
 
 ## Curriculum map
 
@@ -54,7 +54,7 @@ The **capstone** is the `MemberClub` web app at `apps/memberclub/web/`, plus the
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 rustup component add clippy rustfmt rust-src
 
-# 2. Verify the workspace builds (148 tests should pass)
+# 2. Verify the workspace (fmt + clippy -D warnings + the full test suite)
 make verify
 
 # 3. Try the Phase 9 web app
@@ -82,7 +82,7 @@ seeding-testing/
 ├── Makefile                        make verify, up, down, migrate, seed
 ├── compose.yaml                    Postgres + Redis + MailHog
 ├── rust-toolchain.toml             stable
-├── Cargo.toml                      workspace root (8 members)
+├── Cargo.toml                      workspace root (18 members)
 ├── .github/workflows/
 │   ├── ci.yml                      fmt, clippy, nextest, deny, audit, web matrix
 │   ├── cd.yml                      GHCR build, sqlx migrate, Fly.io deploy
@@ -108,19 +108,30 @@ seeding-testing/
 │   ├── phase-10-observability/
 │   ├── phase-11-perf-caching-jobs/
 │   └── phase-12-principal-skills/
-├── projects/                       (8 standalone Rust projects)
+├── projects/                       (16 Rust projects + 2 SvelteKit warm-ups)
 │   ├── 01-hello-cli/               clap CLI, 16 tests
 │   ├── 02-quote-generator/         concurrent HTTP, 9 tests
 │   ├── 02b-sqlite-notes-svelte/    SvelteKit + Drizzle + SQLite, 7 vitest
-│   ├── 02c-sqlx-notes/             sqlx + SQLite, 12 tests
-│   ├── 03-notes-api/               Axum CRUD + seed CLI, 17 tests
-│   ├── 04-auth-demo/               argon2 + cookies + JWT, 18 tests
+│   ├── 02c-sqlx-notes/             sqlx + SQLite (testcontainers), 21 tests
+│   ├── 03-notes-api/               Axum CRUD + keyset + OpenAPI + seed CLI
+│   ├── 04-auth-demo/               argon2 + cookies + JWT + TOTP + OAuth + magic-link
 │   ├── 05-rbac-policy-lab/         pure policy library, 31 tests
-│   ├── 06-stripe-money-lab/        Money primitive, 25 tests
-│   └── 07-webhook-receiver/        Stripe webhook receiver, 8 tests
+│   ├── 06-stripe-money-lab/        Money primitive, 29 tests
+│   ├── 07-webhook-receiver/        Stripe webhook receiver, 8 tests
+│   ├── 08-outbox-demo/             transactional outbox (SQLite), 13 tests
+│   ├── 09-svelte-counter/          Svelte 5 runes warm-up, 6 vitest
+│   ├── 10-memberclub-cli/          API client CLI
+│   ├── 11-redis-cache/             cache + single-flight + rate limit, 9 tests
+│   ├── 12-multi-tenant-rls/        Postgres row-level security
+│   ├── 13-load-test/               load generator + percentiles
+│   ├── 14-sagas/                   saga orchestrator + compensation, 12 tests
+│   ├── 15-capacity-planner/        capacity math, 11 tests
+│   └── 16-event-sourcing/          event sourcing + CQRS, 16 tests
 └── apps/
-    └── memberclub/
-        └── web/                    SvelteKit 2.20 + Svelte 5.55, 5 vitest
+    └── memberclub/                 full-stack capstone
+        ├── api/                    Axum + sqlx (Postgres) service
+        ├── web/                    SvelteKit 2.20 + Svelte 5.55, 5 vitest
+        └── infra/                  Dockerfiles + prod compose + Caddy
 ```
 
 ## Stack pinned to May 26, 2026

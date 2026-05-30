@@ -17,7 +17,7 @@ You typically run all three.
 
 ```toml
 [dependencies]
-tower_governor = "0.7"
+tower_governor = "0.8"
 ```
 
 ```rust
@@ -29,8 +29,10 @@ let governor_conf = GovernorConfigBuilder::default()
     .burst_size(20)              // bursts up to 20
     .finish().unwrap();
 
+// In tower_governor 0.8 the layer is built with `::new(...)`; the
+// config is wrapped in an `Arc` for you.
 let app = Router::new().route(...)
-    .layer(GovernorLayer { config: governor_conf.into() });
+    .layer(GovernorLayer::new(governor_conf));
 ```
 
 Returns `429 Too Many Requests` with a `Retry-After` header when exceeded. The default key is the client IP (via `X-Forwarded-For` behind a trusted proxy; configure carefully).

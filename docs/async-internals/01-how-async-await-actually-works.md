@@ -323,10 +323,13 @@ The caveats:
   docs. Most Tokio primitives are documented as cancellation-safe or
   not; check before using inside `select!`.
 
-[`projects/14-sagas`](../../projects/14-sagas/) deals with this head-on:
-when a saga's overall timeout fires, the in-flight step is canceled, and
-the saga's compensation logic has to handle "did that step partially
-complete?" The answer is "we don't know — write idempotent compensations."
+[`projects/14-sagas`](../../projects/14-sagas/) is where this bites in
+production: the lab orchestrator has no per-step timeout (see
+[`../distributed-systems/04-failure-modes.md`](../distributed-systems/04-failure-modes.md),
+"slow vs failed"), but the moment you wrap a step in `tokio::time::timeout`
+and it fires, the in-flight step's future is dropped mid-`.await` and the
+compensation logic has to handle "did that step partially complete?" The
+answer is "we don't know — write idempotent compensations."
 
 ## `Send` bounds across awaits
 
@@ -389,12 +392,14 @@ Or just use `Arc` everywhere. The runtime overhead is real but tiny.
   `join!` vs `select!`.
 - [`projects/08-outbox-demo`](../../projects/08-outbox-demo/) — the chaos
   test deliberately cancels worker tasks mid-loop to exercise the
-  "dropped future" recovery path. Also the canonical example of
-  `FOR UPDATE SKIP LOCKED` for queue-shaped workloads (see
+  "dropped future" recovery path. Also the worked example of the
+  claim-a-queue-row pattern whose Postgres production form is
+  `FOR UPDATE SKIP LOCKED` (see
   [`../database-internals/01-mvcc-and-isolation-levels.md`](../database-internals/01-mvcc-and-isolation-levels.md)).
-- [`projects/14-sagas`](../../projects/14-sagas/) — timeouts during
-  compensation. What happens when the cancellation deadline fires while
-  a compensating step is mid-flight.
+- [`projects/14-sagas`](../../projects/14-sagas/) — cancellation safety.
+  What *would* happen if you wrapped a step in `tokio::time::timeout`
+  and the deadline fired mid-flight (the lab itself ships no timeout —
+  the design note is in the crate docs).
 
 ## Things to read once you've internalized the above
 

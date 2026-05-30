@@ -57,7 +57,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt().compact().init();
     let cli = Cli::parse();
 
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite::dev.sqlite".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://./dev.sqlite".into());
     if !cli.allow_prod && url.contains("prod") {
         anyhow::bail!("URL contains 'prod'; pass --allow-prod to override");
     }
@@ -111,8 +111,18 @@ pub mod seed {
             "Reminder: incident runbook lives at docs/runbooks/",
         ];
         for body in bodies {
-            // Upsert by body — not realistic for production but fine for demo.
-            sqlx_notes::add(pool, body).await.ok();
+            // Idempotent insert: skip if a note with this exact body
+            // already exists, so re-running the demo seed converges
+            // instead of duplicating. (A real schema would use a UNIQUE
+            // column + ON CONFLICT; we dedup by body here for teaching.)
+            let exists: Option<i64> =
+                sqlx::query_scalar("SELECT id FROM notes WHERE body = ?")
+                    .bind(body)
+                    .fetch_optional(pool)
+                    .await?;
+            if exists.is_none() {
+                sqlx_notes::add(pool, body).await?;
+            }
         }
         Ok(())
     }

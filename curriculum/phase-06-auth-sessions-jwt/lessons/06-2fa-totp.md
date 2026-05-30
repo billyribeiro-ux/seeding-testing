@@ -7,7 +7,7 @@
 
 TOTP (Time-based One-Time Password, RFC 6238) is a 6-digit code derived from:
 
-- A shared secret (32 bytes random, base32-encoded).
+- A shared secret (20 bytes random — the RFC 4226/6238 standard length for SHA-1 — base32-encoded).
 - The current Unix time, divided into 30-second steps.
 
 The authenticator app (Google Authenticator, 1Password, Authy, …) and the server both compute the same code at the same time. They never communicate; the secret was exchanged once at enrollment.
@@ -17,7 +17,7 @@ A code is valid for ~30 s. The server allows a small window (±1 step) for clock
 ## Enrollment flow
 
 ```
-1. Server generates a random 32-byte secret.
+1. Server generates a random 20-byte secret.
 2. Server stores it (encrypted at rest) under user.totp_secret.
 3. Server returns a `provisioning_uri`:
      otpauth://totp/MemberClub:alice@b.com?secret=BASE32SECRET&issuer=MemberClub

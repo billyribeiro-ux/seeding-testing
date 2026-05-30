@@ -26,7 +26,7 @@ A `Future` is a paused recipe. `.await` is "I'm waiting on something — chef, t
 
 ## 4. Money is Not a Float
 
-Ever. The curriculum codifies this in a single `Money(i64 cents, Currency)` newtype. The constant `MONEY_CEILING_CENTS = 2_100_000_000_00` ($21B) bounds every monetary value. See `docs/00-mental-models/money.md` and ADR `0003-money-i64-cents.md`.
+Ever. The curriculum codifies this in a single `Money(i64 cents, Currency)` newtype. The constant `MONEY_CEILING_CENTS = 2_100_000_000_000` ($21B, i.e. 2.1 trillion cents) bounds every monetary value. See `docs/00-mental-models/money.md` and ADR `0003-money-i64-cents.md`.
 
 ## 5. Authentication ≠ Authorization
 

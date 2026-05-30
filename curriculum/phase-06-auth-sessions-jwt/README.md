@@ -41,10 +41,10 @@ A real Axum service that demonstrates every primitive in the phase plan:
 - **`POST /auth/logout`** — invalidates the session row.
 - **`POST /auth/refresh`** — single-use refresh, with reuse detection.
 - **`POST /auth/totp/enroll`** — start 2FA enrollment (returns provisioning URI + recovery codes).
-- **`POST /auth/totp/verify`** — confirm enrollment.
+- **`POST /auth/totp/confirm`** — confirm enrollment.
 - **`GET  /me`** — protected; works via either cookie *or* `Authorization: Bearer`.
 
-Backed by SQLite (so the project builds without Docker). Argon2id, RS256-signed JWTs, signed cookies via `axum-extra::SignedCookieJar`, integration tests covering happy + sad paths.
+Backed by SQLite (so the project builds without Docker). Argon2id, HS256-signed JWTs by default (RS256 + JWKS is the E6.5 stretch in `jwt_rs256.rs`), signed cookies via `axum-extra::SignedCookieJar`, integration tests covering happy + sad paths.
 
 ## Green-bar checkpoint
 

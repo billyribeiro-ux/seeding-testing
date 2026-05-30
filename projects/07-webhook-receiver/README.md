@@ -44,9 +44,9 @@ defense:
 | File | Purpose |
 |---|---|
 | `migrations/...` | `stripe_events` table with UNIQUE on `stripe_event_id` |
-| `src/lib.rs` | Router, `AppState`, `parse_signature_header`, `compute_signature`, `verify_signature`, `store_event`, `mark_processed`, the `webhook` handler |
+| `src/lib.rs` | Router, `AppState`, `parse_signature_header`, `compute_signature`, `verify_signature`, `store_event`, `pending_event_id`, `mark_processed`, the `webhook` handler |
 | `src/main.rs` | Binary boots the router with `STRIPE_WEBHOOK_SECRET` from env |
-| `tests/webhook.rs` | 8 integration tests covering every defense |
+| `tests/webhook.rs` | 9 integration tests covering every defense, incl. crash-then-resume |
 
 ## How the signature is verified
 

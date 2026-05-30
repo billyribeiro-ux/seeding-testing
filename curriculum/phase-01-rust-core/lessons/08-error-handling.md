@@ -78,8 +78,8 @@ pub enum BillingError {
 `#[derive(Error)]` generates the `Display` and `Error::source` implementations for you. `#[from]` generates an `impl From<sqlx::Error> for BillingError` so the `?` operator just works on `sqlx` calls:
 
 ```rust
-pub fn charge(amount: i64, currency: &str) -> Result<(), BillingError> {
-    if amount > 2_100_000_000_00 { return Err(BillingError::InvalidAmount(amount)); }
+pub async fn charge(amount: i64, currency: &str) -> Result<(), BillingError> {
+    if amount > 2_100_000_000_000 { return Err(BillingError::InvalidAmount(amount)); }  // $21B ceiling, in cents
     let _row = sqlx::query!("…").execute(&pool).await?;  // sqlx::Error → BillingError
     Ok(())
 }

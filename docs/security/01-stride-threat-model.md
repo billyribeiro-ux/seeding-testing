@@ -163,7 +163,7 @@ write-only role or a downstream warehouse).
 **Threat.** Stripe says we charged a customer; the customer says no.
 
 **Mitigation in repo.** `stripe_events` is the authoritative log of
-every webhook we accepted (`projects/07-webhook-receiver/src/lib.rs:285`,
+every webhook we accepted (`projects/07-webhook-receiver/src/lib.rs:242`,
 `store_event`). The row includes the raw body and the stripe event id;
 the (event id, received-at) tuple gives us a defensible record.
 
@@ -263,7 +263,7 @@ the ingress layer (nginx `client_max_body_size`).
 with 10k events in a minute.
 
 **Mitigation in repo.** Idempotent insert
-(`projects/07-webhook-receiver/src/lib.rs:285`, `store_event`)
+(`projects/07-webhook-receiver/src/lib.rs:242`, `store_event`)
 short-circuits duplicates without doing real work. The handler returns
 200 fast on duplicates (`:288`).
 

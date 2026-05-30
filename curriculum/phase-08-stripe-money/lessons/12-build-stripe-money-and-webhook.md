@@ -5,7 +5,7 @@
 
 ## Capstone 1 — `projects/06-stripe-money-lab`
 
-A pure-Rust money primitive library. 25 tests (19 unit + 6 proptest).
+A pure-Rust money primitive library. 29 tests (21 unit + 8 proptest).
 
 ### Files
 

@@ -1,16 +1,24 @@
 //! multi-tenant-rls — the policy layer that builds the SQL for
 //! tenant-isolated, row-level-secured Postgres tables.
 //!
-//! The pattern (from `docs/01-architecture-decisions/0007-postgres-row-level-security.md`):
+//! The mechanism is the one from
+//! `docs/01-architecture-decisions/0007-postgres-rls-tenant-isolation.md`:
 //!
-//!   1. Every tenant-scoped table has a `tenant_id UUID NOT NULL`.
+//!   1. Every tenant-scoped table carries a tenant key column.
 //!   2. The table has RLS enabled: `ALTER TABLE x ENABLE ROW LEVEL
 //!      SECURITY`.
 //!   3. A policy filters reads + writes by a session GUC the app sets
-//!      at the start of each request: `SET LOCAL app.tenant_id = '...'`.
+//!      at the start of each request transaction.
 //!   4. The app role is NOT a Postgres superuser — RLS bypass for
 //!      superusers is the whole reason migrations run as a separate
 //!      `app_migrator` role.
+//!
+//! Note on the key type: the MemberClub capstone (and ADR 0007) use an
+//! `org_id BIGINT` key with the `app.current_org_id` GUC. This lab uses a
+//! `tenant_id UUID` key with `app.tenant_id` on purpose — RLS is entirely
+//! key-type-agnostic, and showing both makes that explicit. The six SQL
+//! statements are identical; only the column name and the `::uuid` /
+//! `::bigint` cast differ.
 //!
 //! What this crate provides:
 //!
@@ -22,10 +30,10 @@
 //!   * [`set_local_tenant_sql`] — the exact `SET LOCAL` statement the
 //!     app issues at the top of every request transaction.
 //!
-//! The integration test in `tests/rls.rs` is gated on a real
-//! `DATABASE_URL` — when run against Postgres it proves the policy
-//! actually blocks cross-tenant reads. When the env var is absent the
-//! test is `#[ignore]`'d so `make verify` stays hermetic.
+//! A real-DB integration test (`tests/rls.rs`, gated on a `DATABASE_URL`
+//! and skipped when it is absent so `make verify` stays hermetic) is the
+//! curriculum exercise: once Postgres is up, the learner writes it to
+//! prove the policy actually blocks cross-tenant reads.
 
 use std::fmt::Write as _;
 

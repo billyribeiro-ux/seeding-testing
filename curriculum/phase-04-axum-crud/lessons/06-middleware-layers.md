@@ -79,9 +79,9 @@ For ad-hoc work, a `from_fn` middleware is the simplest:
 
 ```rust
 use axum::middleware::{self, Next};
-use axum::http::Request;
+use axum::extract::Request;
 
-async fn add_powered_by<B>(req: Request<B>, next: Next<B>) -> Response {
+async fn add_powered_by(req: Request, next: Next) -> Response {
     let mut res = next.run(req).await;
     res.headers_mut().insert("x-powered-by", "memberclub".parse().unwrap());
     res

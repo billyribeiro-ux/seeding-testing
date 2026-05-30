@@ -36,14 +36,14 @@ Chose **option 3**.
 
 - A single `Money(i64 cents, Currency)` newtype defined in
   `projects/06-stripe-money-lab`.
-- Constants: `MONEY_CEILING_CENTS = 210_000_000_000` ($21B).
+- Constants: `MONEY_CEILING_CENTS = 2_100_000_000_000` ($21B, i.e. 2.1 trillion cents).
   Constructor refuses values whose absolute value reaches the ceiling.
 - All arithmetic via `checked_add`, `checked_sub`, `checked_mul`.
   No `std::ops::Add`/`Sub`/`Mul` implementations — overflow cannot be
   silently ignored.
 - Currency mismatch returns a typed `MoneyError::CurrencyMismatch`.
 - DB columns: `BIGINT NOT NULL` with
-  `CHECK (amount_cents > -2_100_000_000_00 AND amount_cents < 2_100_000_000_00)`
+  `CHECK (amount_cents > -2100000000000 AND amount_cents < 2100000000000)`
   alongside a `currency CHAR(3) NOT NULL` column.
 - Proportional splits use the largest-remainder method
   (`Money::split_proportional`) — proven by proptest to sum exactly.
