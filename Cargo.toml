@@ -30,24 +30,27 @@ repository = "https://github.com/billyribeiro-ux/seeding-testing"
 authors    = ["Seeding-Testing Curriculum <hello@example.invalid>"]
 
 # Shared dependency versions — every crate in the workspace can `dep.workspace = true`.
-# Pin to the May 2026 stack from the curriculum plan.
+# Pin to the June 2026 stack from the curriculum plan.
 [workspace.dependencies]
-# Pins target the May 26, 2026 latest stable; semver-compatible patch updates allowed.
+# Pins target the June 2, 2026 latest stable; semver-compatible patch updates allowed.
 # CLI
 clap        = { version = "4.6", features = ["derive"] }
 anyhow      = "1.0"
 thiserror   = "2.0"
 
 # Async runtime + HTTP
-tokio    = { version = "1.51", features = ["macros", "rt-multi-thread", "time", "signal", "sync", "fs", "io-util"] }
-reqwest  = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
+tokio    = { version = "1.52", features = ["macros", "rt-multi-thread", "time", "signal", "sync", "fs", "io-util"] }
+# reqwest 0.13 renamed the `rustls-tls` feature to `rustls` (now aws-lc-rs +
+# rustls-platform-verifier by default) and made `form`/`query` opt-in.
+# See reqwest CHANGELOG v0.13.0.
+reqwest  = { version = "0.13", default-features = false, features = ["rustls", "json", "stream", "form"] }
 futures  = "0.3"
-humantime = "2.2"
+humantime = "2.3"
 
 # Database (sqlx) + types
-sqlx     = { version = "0.8", default-features = false }
+sqlx     = { version = "0.9", default-features = false }
 chrono   = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
-uuid     = { version = "1.10", features = ["v4", "v7", "serde"] }
+uuid     = { version = "1.23", features = ["v4", "v7", "serde"] }
 
 # HTTP framework + tower
 axum     = { version = "0.8", default-features = false, features = ["http1", "http2", "tokio", "json", "matched-path", "tracing", "query"] }
@@ -69,8 +72,8 @@ tempfile    = "3.27"
 wiremock    = "0.6"
 insta       = "1"
 proptest    = "1"
-fake        = { version = "4", features = ["derive"] }
-rand        = "0.9"
+fake        = { version = "5", features = ["derive"] }
+rand        = "0.10"
 
 [profile.dev]
 opt-level    = 0

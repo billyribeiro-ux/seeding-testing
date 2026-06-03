@@ -12,7 +12,7 @@
 //! Eight recovery codes are issued at enrollment so a lost-phone user can
 //! still get in. Each one is consumed on use (single-shot).
 
-use rand::TryRngCore;
+use rand::TryRng;
 use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
 use totp_rs::{Algorithm, Secret, TOTP};
@@ -44,7 +44,7 @@ pub async fn begin_enrollment(
     user_email: &str,
 ) -> Result<EnrollmentArtifacts, sqlx::Error> {
     let mut secret_bytes = [0u8; SECRET_LEN];
-    rand::rngs::OsRng
+    rand::rngs::SysRng
         .try_fill_bytes(&mut secret_bytes)
         .expect("OS RNG must work");
     let secret = Secret::Raw(secret_bytes.to_vec());
@@ -213,7 +213,7 @@ fn verify_code(secret_b32: &str, code: &str) -> bool {
 /// to make brute-force online attacks impractical.
 fn new_recovery_code() -> String {
     let mut buf = [0u8; 8];
-    rand::rngs::OsRng
+    rand::rngs::SysRng
         .try_fill_bytes(&mut buf)
         .expect("OS RNG must work");
     let s = hex::encode(buf);
@@ -256,7 +256,7 @@ mod tests {
     #[test]
     fn round_trip_generates_then_verifies() {
         let mut buf = [0u8; SECRET_LEN];
-        rand::rngs::OsRng.try_fill_bytes(&mut buf).unwrap();
+        rand::rngs::SysRng.try_fill_bytes(&mut buf).unwrap();
         let secret_b32 = Secret::Raw(buf.to_vec()).to_encoded().to_string();
 
         let code = current_code_for_secret(&secret_b32).unwrap();

@@ -1,5 +1,5 @@
-# Curriculum targets Rust 1.95.0 (stable as of May 2026). Any 1.80+ stable will build everything.
-# Pin a specific version once the team is ready to lock it down (e.g. `channel = "1.95.0"`).
+# Curriculum targets Rust 1.96.0 (stable as of June 2026). sqlx 0.9 requires >= 1.94.
+# Pin a specific version once the team is ready to lock it down (e.g. `channel = "1.96.0"`).
 [toolchain]
 channel = "stable"
 components = ["rustfmt", "clippy", "rust-analyzer", "rust-src"]

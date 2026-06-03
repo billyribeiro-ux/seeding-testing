@@ -27,7 +27,7 @@
 //!      compensation actually ran (rather than the charge happening to
 //!      not land).
 
-use rand::Rng;
+use rand::RngExt;
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 use sagas::{FakeWorld, SagaContext, upgrade_subscription_saga};

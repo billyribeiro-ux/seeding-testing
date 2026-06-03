@@ -26,7 +26,7 @@ use axum::routing::{get, post};
 use axum_extra::extract::SignedCookieJar;
 use axum_extra::extract::cookie::{Cookie, Key, SameSite};
 use governor::middleware::NoOpMiddleware;
-use rand::TryRngCore;
+use rand::TryRng;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use thiserror::Error;
@@ -1119,7 +1119,7 @@ fn validate_password(p: &str) -> Result<(), ApiError> {
 pub fn random_token_b64url(bytes: usize) -> String {
     use base64::Engine;
     let mut buf = vec![0u8; bytes];
-    rand::rngs::OsRng
+    rand::rngs::SysRng
         .try_fill_bytes(&mut buf)
         .expect("OS RNG must work");
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&buf)

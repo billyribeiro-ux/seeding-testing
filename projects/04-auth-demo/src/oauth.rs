@@ -37,7 +37,7 @@
 //! endpoints.
 
 use base64::Engine;
-use rand::TryRngCore;
+use rand::TryRng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -336,7 +336,7 @@ fn parse_id_token_payload(id_token: &str) -> Option<OauthUserInfo> {
 #[must_use]
 pub fn new_code_verifier() -> String {
     let mut buf = [0u8; 32];
-    rand::rngs::OsRng
+    rand::rngs::SysRng
         .try_fill_bytes(&mut buf)
         .expect("OS RNG must work");
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(buf)
@@ -355,7 +355,7 @@ pub fn code_challenge_s256(verifier: &str) -> String {
 #[must_use]
 pub fn new_state() -> String {
     let mut buf = [0u8; 32];
-    rand::rngs::OsRng
+    rand::rngs::SysRng
         .try_fill_bytes(&mut buf)
         .expect("OS RNG must work");
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(buf)

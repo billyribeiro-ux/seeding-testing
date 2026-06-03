@@ -262,7 +262,7 @@ async fn register(
         "INSERT INTO users (email, password_hash) VALUES (?, ?) RETURNING {}",
         auth::USER_COLUMNS
     );
-    let user: User = sqlx::query_as::<_, User>(&sql)
+    let user: User = sqlx::query_as::<_, User>(sqlx::AssertSqlSafe(sql))
         .bind(&body.email)
         .bind(&hash)
         .fetch_one(&s.pool)

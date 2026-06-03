@@ -8,7 +8,7 @@
 
 use chrono::Utc;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
-use rand::TryRngCore;
+use rand::TryRng;
 use serde::{Deserialize, Serialize};
 
 pub const ACCESS_TTL_SECS: i64 = 15 * 60;
@@ -47,7 +47,7 @@ impl Jwt {
     /// Generate a fresh random secret. Useful at startup if no env var is set.
     pub fn random_secret() -> [u8; 32] {
         let mut buf = [0u8; 32];
-        rand::rngs::OsRng
+        rand::rngs::SysRng
             .try_fill_bytes(&mut buf)
             .expect("OS RNG must work");
         buf
@@ -132,7 +132,7 @@ impl Jwt {
 
 fn jti() -> String {
     let mut buf = [0u8; 16];
-    rand::rngs::OsRng
+    rand::rngs::SysRng
         .try_fill_bytes(&mut buf)
         .expect("OS RNG must work");
     hex::encode(buf)

@@ -30,7 +30,7 @@ use std::sync::Arc;
 use base64::Engine;
 use chrono::Utc;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
-use rand::TryRngCore;
+use rand::TryRng;
 use rsa::pkcs1::DecodeRsaPublicKey;
 use rsa::pkcs8::{EncodePrivateKey, EncodePublicKey, LineEnding};
 use rsa::rand_core::OsRng as RsaOsRng;
@@ -266,7 +266,7 @@ fn kid_from_n_bytes(n_bytes: &[u8]) -> String {
 
 fn random_jti() -> String {
     let mut buf = [0u8; 16];
-    rand::rngs::OsRng
+    rand::rngs::SysRng
         .try_fill_bytes(&mut buf)
         .expect("OS RNG must work");
     hex::encode(buf)

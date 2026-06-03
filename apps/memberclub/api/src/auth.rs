@@ -16,7 +16,7 @@ use axum::http::request::Parts;
 use axum_extra::extract::SignedCookieJar;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
-use rand::TryRngCore;
+use rand::TryRng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
@@ -191,7 +191,7 @@ impl Jwt {
     #[must_use]
     pub fn random_secret() -> [u8; 32] {
         let mut buf = [0u8; 32];
-        rand::rngs::OsRng
+        rand::rngs::SysRng
             .try_fill_bytes(&mut buf)
             .expect("OS RNG must work");
         buf
@@ -223,7 +223,7 @@ impl Jwt {
 
 fn jti() -> String {
     let mut buf = [0u8; 16];
-    rand::rngs::OsRng
+    rand::rngs::SysRng
         .try_fill_bytes(&mut buf)
         .expect("OS RNG must work");
     hex::encode(buf)
@@ -237,7 +237,7 @@ fn jti() -> String {
 pub fn random_token_b64url(bytes: usize) -> String {
     use base64::Engine;
     let mut buf = vec![0u8; bytes];
-    rand::rngs::OsRng
+    rand::rngs::SysRng
         .try_fill_bytes(&mut buf)
         .expect("OS RNG must work");
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&buf)
@@ -301,7 +301,7 @@ pub const USER_COLUMNS: &str =
 
 pub async fn fetch_user(pool: &SqlitePool, id: i64) -> Result<Option<User>, ApiError> {
     let sql = format!("SELECT {USER_COLUMNS} FROM users WHERE id = ?");
-    let user = sqlx::query_as::<_, User>(&sql)
+    let user = sqlx::query_as::<_, User>(sqlx::AssertSqlSafe(sql))
         .bind(id)
         .fetch_optional(pool)
         .await?;
@@ -310,7 +310,7 @@ pub async fn fetch_user(pool: &SqlitePool, id: i64) -> Result<Option<User>, ApiE
 
 pub async fn fetch_user_by_email(pool: &SqlitePool, email: &str) -> Result<Option<User>, ApiError> {
     let sql = format!("SELECT {USER_COLUMNS} FROM users WHERE email = ?");
-    let user = sqlx::query_as::<_, User>(&sql)
+    let user = sqlx::query_as::<_, User>(sqlx::AssertSqlSafe(sql))
         .bind(email)
         .fetch_optional(pool)
         .await?;

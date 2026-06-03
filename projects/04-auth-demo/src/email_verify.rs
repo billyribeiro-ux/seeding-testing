@@ -21,7 +21,7 @@
 
 use base64::Engine;
 use chrono::{Duration, Utc};
-use rand::TryRngCore;
+use rand::TryRng;
 use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
 
@@ -30,7 +30,7 @@ use sqlx::SqlitePool;
 #[must_use]
 pub fn new_token() -> String {
     let mut buf = [0u8; 32];
-    rand::rngs::OsRng
+    rand::rngs::SysRng
         .try_fill_bytes(&mut buf)
         .expect("OS RNG must work");
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(buf)

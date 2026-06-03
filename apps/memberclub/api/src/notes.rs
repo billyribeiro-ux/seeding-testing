@@ -104,7 +104,7 @@ async fn list_notes(
     user: AuthenticatedUser,
 ) -> Result<Json<Vec<NoteDto>>, ApiError> {
     let sql = format!("SELECT {NOTE_COLUMNS} FROM notes WHERE owner_id = ? ORDER BY id DESC");
-    let rows = sqlx::query_as::<_, Note>(&sql)
+    let rows = sqlx::query_as::<_, Note>(sqlx::AssertSqlSafe(sql))
         .bind(user.0.id)
         .fetch_all(&s.pool)
         .await?;
@@ -138,7 +138,7 @@ async fn create_note(
         "INSERT INTO notes (owner_id, org_id, body, min_tier, published_at) \
          VALUES (?, ?, ?, ?, ?) RETURNING {NOTE_COLUMNS}"
     );
-    let note = sqlx::query_as::<_, Note>(&sql)
+    let note = sqlx::query_as::<_, Note>(sqlx::AssertSqlSafe(sql))
         .bind(user.0.id)
         .bind(user.0.org_id)
         .bind(trimmed)
@@ -219,7 +219,7 @@ async fn update_note(
         "UPDATE notes SET body = ?, min_tier = ?, published_at = ? \
          WHERE id = ? RETURNING {NOTE_COLUMNS}"
     );
-    let updated = sqlx::query_as::<_, Note>(&sql)
+    let updated = sqlx::query_as::<_, Note>(sqlx::AssertSqlSafe(sql))
         .bind(&note.body)
         .bind(&note.min_tier)
         .bind(&note.published_at)
@@ -267,7 +267,7 @@ async fn delete_note(
 
 async fn load_note(pool: &SqlitePool, id: i64) -> Result<Note, ApiError> {
     let sql = format!("SELECT {NOTE_COLUMNS} FROM notes WHERE id = ?");
-    let note = sqlx::query_as::<_, Note>(&sql)
+    let note = sqlx::query_as::<_, Note>(sqlx::AssertSqlSafe(sql))
         .bind(id)
         .fetch_optional(pool)
         .await?;
